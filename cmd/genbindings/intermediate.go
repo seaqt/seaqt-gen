@@ -234,6 +234,7 @@ func (p CppParameter) Void() bool {
 type CppProperty struct {
 	PropertyName string
 	PropertyType string
+	IsStatic     bool
 	Visibility   string
 }
 
