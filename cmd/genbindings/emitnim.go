@@ -1049,23 +1049,27 @@ export ` + gfs.currentUnitName + `_types
 				cbTypeName := nimClassName + m.rawMethodName() + "Slot"
 				cbType := `proc(` + gfs.emitParametersNim(m.Parameters, false) + `)`
 
-				fmt.Fprintf(&cabi, `proc %[1]s(self: pointer, slot: int) {.importc: "%[2]s".}
-`, ncabiConnectName(c, m), cabiConnectName(c, m))
+				fmt.Fprintf(&cabi, `proc %[1]s(self: pointer, slot: int, callback: proc (%[3]s) {.cdecl.}, release: proc(slot: int) {.cdecl.}) {.importc: "%[2]s".}
+`, ncabiConnectName(c, m), cabiConnectName(c, m), strings.Join(namedParams, ", "))
 
 				fmt.Fprintf(&ret, `type %[1]s* = %[2]s
-proc %[3]s(%[4]s) {.exportc: "%[10]s".} =
+proc %[3]s(%[4]s) {.cdecl.} =
   let nimfunc = cast[ptr %[1]s](cast[pointer](slot))
 %[5]s  nimfunc[](%[6]s)
+
+proc %[3]s_release(slot: int) {.cdecl.} =
+  let nimfunc = cast[ref %[1]s](cast[pointer](slot))
+  GC_unref(nimfunc)
 
 proc on%[8]s*(self: %[9]s, slot: %[1]s) =
   var tmp = new %[1]s
   tmp[] = slot
   GC_ref(tmp)
-  %[7]s(self.h, cast[int](addr tmp[]))
+  %[7]s(self.h, cast[int](addr tmp[]), %[3]s, %[3]s_release)
 
 `, cbTypeName, cbType, ncabiCallbackName(c, m), strings.Join(namedParams, ", "),
 					conversion, strings.Join(paramNames, `, `), ncabiConnectName(c, m),
-					m.nimMethodName(), nimPkgClassName, cabiCallbackName(c, m))
+					m.nimMethodName(), nimPkgClassName)
 			}
 		}
 

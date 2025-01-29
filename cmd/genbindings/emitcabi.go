@@ -34,10 +34,6 @@ func (p CppParameter) cParameterName() string {
 	return parmName
 }
 
-func cabiCallbackName(c CppClass, m CppMethod) string {
-	return "miqt_exec_callback_" + cabiClassName(c.ClassName) + "_" + m.SafeMethodName()
-}
-
 func cabiNewName(c CppClass, i int) string {
 	return cabiClassName(c.ClassName) + `_new` + maybeSuffix(i)
 }
@@ -874,7 +870,12 @@ extern "C" {
 			ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiMethodName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+className+"*")))
 
 			if m.IsSignal {
-				ret.WriteString(fmt.Sprintf("%s %s(%s* self, intptr_t slot);\n", m.ReturnType.RenderTypeCabi(), cabiConnectName(c, m), className))
+				callbackParams := "intptr_t"
+
+				for _, p := range m.Parameters {
+					callbackParams += ", " + p.RenderTypeCabi()
+				}
+				ret.WriteString(fmt.Sprintf("%s %s(%s* self, intptr_t slot, void (*callback)(%s), void (*release)(intptr_t));\n", m.ReturnType.RenderTypeCabi(), cabiConnectName(c, m), className, callbackParams))
 			}
 		}
 
@@ -980,13 +981,6 @@ extern "C" {
 	for _, c := range src.Classes {
 		for _, m := range c.Methods {
 			if m.IsSignal {
-				callback := "void " + cabiCallbackName(c, m) + "(intptr_t"
-
-				for _, p := range m.Parameters {
-					callback += ", " + p.RenderTypeCabi()
-				}
-				callback += ");\n"
-				ret.WriteString(callback)
 			}
 		}
 	}
@@ -1280,18 +1274,29 @@ extern "C" {
 				var signalCode string
 
 				for i, p := range m.Parameters {
-					signalCode += emitAssignCppToCabi(fmt.Sprintf("\t\t%s sigval%d = ", p.RenderTypeCabi(), i+1), p, p.cParameterName())
+					signalCode += emitAssignCppToCabi(fmt.Sprintf("\t\t\t%s sigval%d = ", p.RenderTypeCabi(), i+1), p, p.cParameterName())
 					paramArgs = append(paramArgs, fmt.Sprintf("sigval%d", i+1))
 					paramArgDefs = append(paramArgDefs, p.RenderTypeCabi()+" "+p.cParameterName())
 				}
 
-				signalCode += "\t\t" + cabiCallbackName(c, m) + "(" + strings.Join(paramArgs, `, `) + ");\n"
+				signalCode += "\t\t\tcallback(" + strings.Join(paramArgs, `, `) + ");\n"
+
+				callbackParams := "intptr_t"
+
+				for _, p := range m.Parameters {
+					callbackParams += ", " + p.RenderTypeCabi()
+				}
 
 				ret.WriteString(
-					`void ` + cabiConnectName(c, m) + `(` + methodPrefixName + `* self, intptr_t slot) {` + "\n" +
-						"\t" + cppClassName + `::connect(self, ` + exactSignal + `, self, [=](` + emitParametersCpp(m, "") + `) {` + "\n" +
-						signalCode +
-						"\t});\n" +
+					`void ` + cabiConnectName(c, m) + `(` + methodPrefixName + `* self, intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) {` + `
+	struct local_caller : seaqt::caller {
+		constexpr local_caller(intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) : callback(callback), caller{slot, release} {}
+		void (*callback)(` + callbackParams + `);
+		void operator()(` + emitParametersCpp(m, "") + `) {
+` + signalCode + `		}
+	};
+` +
+						"\t" + cppClassName + `::connect(self, ` + exactSignal + ", self, local_caller{slot, callback, release});\n" +
 						"}\n" +
 						"\n",
 				)

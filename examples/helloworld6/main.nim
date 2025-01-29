@@ -2,7 +2,7 @@ import std/strformat, seaqt/[qapplication, qpushbutton]
 
 proc main() =
   let
-    _ = QApplication.create()
+    _ = QApplication.create() # Initialize Qt
     btn = QPushButton.create("Hello world!")
 
   btn.setFixedWidth(320)
