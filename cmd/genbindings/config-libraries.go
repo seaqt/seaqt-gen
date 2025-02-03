@@ -21,7 +21,7 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 
 			// https://doc.qt.io/qt-5/qtmodules.html#qt-add-ons
 			"PrintSupport", "Script", "Svg", "WebChannel",
-			"WebEngineCore", "WebEngine", "WebEngineWidgets",
+			"WebEngineCore",
 
 			// TODO Not sure where these are from :)
 			"WebKit", "WebKitWidgets"}

@@ -14,28 +14,28 @@ func InsertTypedefs(qt6 bool) {
 	}
 
 	// QString is deleted from this binding
-	KnownTypedefs["QStringList"] = lookupResultTypedef{pp, CppTypedef{"QStringList", parseSingleTypeString("QList<QString>")}}
+	KnownTypedefs["QStringList"] = lookupResultTypedef{pp, "TODO", CppTypedef{"QStringList", parseSingleTypeString("QList<QString>")}}
 
 	// FIXME this isn't picked up automatically because QFile inherits QFileDevice and the name refers to its parent class
-	KnownTypedefs["QFile::FileTime"] = lookupResultTypedef{pp, CppTypedef{"QFile::FileTime", parseSingleTypeString("QFileDevice::FileTime")}}
+	KnownTypedefs["QFile::FileTime"] = lookupResultTypedef{pp, "TODO", CppTypedef{"QFile::FileTime", parseSingleTypeString("QFileDevice::FileTime")}}
 
 	if !qt6 {
 		// n.b. Qt 5 only
-		KnownTypedefs["QLineF::IntersectionType"] = lookupResultTypedef{pp, CppTypedef{"QLineF::IntersectionType", parseSingleTypeString("QLineF::IntersectType")}}
+		KnownTypedefs["QLineF::IntersectionType"] = lookupResultTypedef{pp, "TODO", CppTypedef{"QLineF::IntersectionType", parseSingleTypeString("QLineF::IntersectType")}}
 	} else {
 		// Must be removed for Qt 6
 	}
 
 	// Not sure the reason for this one
-	KnownTypedefs["QSocketDescriptor::DescriptorType"] = lookupResultTypedef{pp, CppTypedef{"QSocketDescriptor::DescriptorType", parseSingleTypeString("QSocketNotifier::Type")}}
+	KnownTypedefs["QSocketDescriptor::DescriptorType"] = lookupResultTypedef{pp, "TODO", CppTypedef{"QSocketDescriptor::DescriptorType", parseSingleTypeString("QSocketNotifier::Type")}}
 
 	// QFile doesn't see QFileDevice parent class enum
-	KnownTypedefs["QFile::Permissions"] = lookupResultTypedef{pp, CppTypedef{"QFile::Permissions", parseSingleTypeString("QFileDevice::Permissions")}}
-	KnownTypedefs["QFileDevice::Permissions"] = lookupResultTypedef{pp, CppTypedef{"QFile::Permissions", parseSingleTypeString("QFlags<QFileDevice::Permission>")}}
-	KnownTypedefs["QIODevice::OpenMode"] = lookupResultTypedef{pp, CppTypedef{"QIODevice::OpenMode", parseSingleTypeString("QIODeviceBase::OpenMode")}}
+	KnownTypedefs["QFile::Permissions"] = lookupResultTypedef{pp, "TODO", CppTypedef{"QFile::Permissions", parseSingleTypeString("QFileDevice::Permissions")}}
+	KnownTypedefs["QFileDevice::Permissions"] = lookupResultTypedef{pp, "TODO", CppTypedef{"QFile::Permissions", parseSingleTypeString("QFlags<QFileDevice::Permission>")}}
+	KnownTypedefs["QIODevice::OpenMode"] = lookupResultTypedef{pp, "TODO", CppTypedef{"QIODevice::OpenMode", parseSingleTypeString("QIODeviceBase::OpenMode")}}
 
 	// Qt 5 WebKit - use of an empty enum (should be possible to support?)
-	KnownEnums["QWebPluginFactory::Extension"] = lookupResultEnum{"qt/webkit", CppEnum{
+	KnownEnums["QWebPluginFactory::Extension"] = lookupResultEnum{"qt/webkit", "TODO", CppEnum{
 		EnumName: "QWebPluginFactory::Extension",
 		UnderlyingType: CppParameter{
 			ParameterType: "int",
@@ -44,19 +44,19 @@ func InsertTypedefs(qt6 bool) {
 
 	if qt6 {
 		// Qt 6 QVariant helper types - needs investigation
-		KnownTypedefs["QVariantHash"] = lookupResultTypedef{"qt6", CppTypedef{"QVariantHash", parseSingleTypeString("QHash<QString,QVariant>")}}
-		KnownTypedefs["QVariantList"] = lookupResultTypedef{"qt6", CppTypedef{"QVariantList", parseSingleTypeString("QList<QVariant>")}}
-		KnownTypedefs["QVariantMap"] = lookupResultTypedef{"qt6", CppTypedef{"QVariantMap", parseSingleTypeString("QMap<QString,QVariant>")}}
+		KnownTypedefs["QVariantHash"] = lookupResultTypedef{"qt6", "TODO", CppTypedef{"QVariantHash", parseSingleTypeString("QHash<QString,QVariant>")}}
+		KnownTypedefs["QVariantList"] = lookupResultTypedef{"qt6", "TODO", CppTypedef{"QVariantList", parseSingleTypeString("QList<QVariant>")}}
+		KnownTypedefs["QVariantMap"] = lookupResultTypedef{"qt6", "TODO", CppTypedef{"QVariantMap", parseSingleTypeString("QMap<QString,QVariant>")}}
 
 		// Qt 6 renamed the enum to LibraryPath, but left some uses of LibraryLocation with a typedef
 		// We don't find the typedef - needs investigation
 		// ONLY add this on Qt 6 builds, breaks Qt 5
-		KnownTypedefs["QLibraryInfo::LibraryLocation"] = lookupResultTypedef{"qt6", CppTypedef{"QLibraryInfo::LibraryLocation", parseSingleTypeString("QLibraryInfo::LibraryPath")}}
+		KnownTypedefs["QLibraryInfo::LibraryLocation"] = lookupResultTypedef{"qt6", "TODO", CppTypedef{"QLibraryInfo::LibraryLocation", parseSingleTypeString("QLibraryInfo::LibraryPath")}}
 
 		// Enums
 
 		// QSysInfo.h is being truncated and not finding any content
-		KnownEnums["QSysInfo::Endian"] = lookupResultEnum{"qt6", CppEnum{
+		KnownEnums["QSysInfo::Endian"] = lookupResultEnum{"qt6", "TODO", CppEnum{
 			EnumName: "QSysInfo::Endian",
 			UnderlyingType: CppParameter{
 				ParameterType: "int",
@@ -294,6 +294,12 @@ func AllowMethod(className string, mm CppMethod) error {
 		if strings.HasSuffix(p.ParameterType, "Private") {
 			return ErrTooComplex // Skip private type
 		}
+		if strings.Contains(p.ParameterType, "ExecutionEngine") {
+			return ErrTooComplex // Skip private type
+		}
+	}
+	if strings.Contains(mm.ReturnType.ParameterType, "ExecutionEngine") {
+		return ErrTooComplex
 	}
 	if strings.HasSuffix(mm.ReturnType.ParameterType, "Private") {
 		return ErrTooComplex // Skip private type
@@ -459,6 +465,9 @@ func AllowType(p CppParameter, isReturnType bool) error {
 	if strings.HasPrefix(p.ParameterType, "QWebEngineCallback<") {
 		return ErrTooComplex // Function pointer types in QtWebEngine
 	}
+	if strings.HasPrefix(p.ParameterType, "QSharedPointer<") {
+		return ErrTooComplex
+	}
 
 	if strings.HasPrefix(p.ParameterType, "std::") {
 		// std::initializer           e.g. qcborarray.h
@@ -524,7 +533,7 @@ func AllowType(p CppParameter, isReturnType bool) error {
 	}
 
 	if p.Pointer && p.PointerCount >= 2 { // Out-parameters
-		if p.ParameterType != "char" {
+		if p.ParameterType != "char" && p.ParameterType != "void" {
 			return ErrTooComplex // e.g. QGraphicsItem_IsBlockedByModalPanel1
 		}
 		if p.ParameterType == "char" && p.ParameterName == "xpm" {
@@ -585,6 +594,15 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"QWebFrameAdapter",                // Qt 5 Webkit: Used by e.g. qwebframe.h but never defined anywhere
 		"QWebPageAdapter",                 // ...
 		"QQmlWebChannelAttached",          // Qt 5 qqmlwebchannel.h. Need to add QML support for this to work
+		"QV4::ExecutionEngine",            // QML stuff onwards
+		"QQmlComponentAttached",           // ..
+		"QOpenGLFramebufferObject",        // ..
+		"QOpenGLContext",                  // ..
+		"QQuickCloseEvent",                // ..
+		"QOpenGLShaderProgram",            // ..
+		"QRhiResourceUpdateBatch",         // ..
+		"QQmlV4Function",                  // ..
+		"QAction",                         // Name conflict between qt modules
 		"____last____":
 		return ErrTooComplex
 	}
