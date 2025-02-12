@@ -205,6 +205,9 @@ func ncabiConnectName(c CppClass, m CppMethod) string {
 func ncabiVirtualBaseName(c CppClass, m CppMethod) string {
 	return "f" + cabiClassNameNim(c.ClassName, true) + `_virtualbase_` + m.rawMethodName()
 }
+func ncabiProtectedBaseName(c CppClass, m CppMethod) string {
+	return "f" + cabiClassNameNim(c.ClassName, true) + `_protectedbase_` + m.SafeMethodName()
+}
 
 func (e CppEnum) nimEnumName() string {
 	enumName := cabiClassNameNim(ifv(strings.HasSuffix(e.EnumName, "::"), e.EnumName+"Enum", e.EnumName), false) // Fully qualified name of the enum itself
@@ -1022,6 +1025,7 @@ export ` + gfs.currentUnitName + `_types
 		nimPkgClassName := gfs.currentUnitName + `_types.` + nimClassName
 		rawClassName := cabiClassNameNim(c.ClassName, true)
 		virtualMethods := c.VirtualMethods()
+		protectedMethods := c.ProtectedMethods()
 
 		// Qt has some overloads (const vs non-const, & vs *) that don't result in
 		// a distinct parameter set on the nim side
@@ -1177,6 +1181,32 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 						ret.WriteString(gfs.ind + rvalue + "\n\n")
 					}
 				}
+			}
+		}
+
+		for _, m := range protectedMethods {
+			// Add a package-private function to call the C++ base class method
+			// QWidget_virtualbase_PaintEvent
+			// This is only possible if the function is not pure-virtual
+
+			if !m.IsPureVirtual {
+				preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m)
+
+				forwarding = "self.h" + strings.TrimPrefix(forwarding, `self.h`) // TODO integrate properly
+
+				returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
+				rawReturnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, true)
+
+				fmt.Fprintf(&cabi, `proc %[1]s(self: pointer, %[3]s): %[4]s {.importc: "%[2]s".}
+`, ncabiProtectedBaseName(c, m), cabiProtectedBaseName(c, m), gfs.emitParametersNim(m.Parameters, true), rawReturnTypeDecl)
+
+				fmt.Fprintf(&ret, `proc %[2]s*(self: %[3]s, %[4]s): %[5]s =
+%[6]s%[7]s
+`,
+					nimClassName, m.nimMethodName(), nimPkgClassName, gfs.emitParametersNim(m.Parameters, false), returnTypeDecl,
+					preamble,
+					gfs.emitCabiToNim("", m.ReturnType, ncabiProtectedBaseName(c, m)+`(`+forwarding+`)`),
+				)
 			}
 		}
 
