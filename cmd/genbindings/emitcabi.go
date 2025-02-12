@@ -882,13 +882,11 @@ extern "C" {
 		for _, m := range virtualMethods {
 			ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiVirtualBaseName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void" /*className*/ +"*")))
 		}
-
 		if len(virtualMethods) > 0 {
 			for _, m := range protectedMethods {
-				ret.WriteString(fmt.Sprintf("%s %s(bool* _dynamic_cast_ok, %s);\n", m.ReturnType.RenderTypeCabi(), cabiProtectedBaseName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void" /*className*/ +"*")))
+				ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiProtectedBaseName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void" /*className*/ +"*")))
 			}
 		}
-
 		for _, p := range c.Props {
 			if p.PropertyName == "staticMetaObject" {
 				ret.WriteString(fmt.Sprintf("const QMetaObject* %s();\n", cabiStaticMetaObjectName(c)))
@@ -1118,7 +1116,7 @@ extern "C" {
 				// (e.g. QAbstractItemView::CursorAction)
 
 				ret.WriteString(
-					"\tfriend " + m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(bool* _dynamic_cast_ok, " + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ");\n",
+					"\tfriend " + m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ");\n",
 				)
 			}
 
@@ -1386,15 +1384,9 @@ extern "C" {
 				//
 
 				ret.WriteString(
-					m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(bool* _dynamic_cast_ok, " + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ") {\n" +
+					m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ") {\n" +
 
-						"\t" + cppClassName + "* self_cast = dynamic_cast<" + cppClassName + "*>( (" + cabiClassName(c.ClassName) + "*)(self) );\n" +
-						"\tif (self_cast == nullptr) {\n" +
-						"\t\t*_dynamic_cast_ok = false;\n" +
-						"\t\treturn " + getCabiZeroValue(m.ReturnType) + ";\n" +
-						"\t}\n" +
-						"\t\n" +
-						"\t*_dynamic_cast_ok = true;\n" +
+						"\t" + cppClassName + "* self_cast = static_cast<" + cppClassName + "*>( (" + cabiClassName(c.ClassName) + "*)(self) );\n" +
 						"\t" + vbpreamble + "\n" +
 						fixupProtectedReferences(emitAssignCppToCabi("\treturn ", m.ReturnType, vbCallTarget)) + "\n" +
 						"}\n" +
