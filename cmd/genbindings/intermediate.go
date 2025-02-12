@@ -545,7 +545,6 @@ func (c *CppClass) ProtectedMethods() []CppMethod {
 	}
 
 	for _, cinfo := range c.AllInheritsClassInfo() {
-
 		for _, m := range cinfo.Class.Methods {
 			if !m.IsProtected {
 				continue
