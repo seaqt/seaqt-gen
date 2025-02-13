@@ -38,11 +38,13 @@ func (c *clangMatchUnderPath) Match(astNodeFilename string) bool {
 
 //
 
-func clangExec(ctx context.Context, clangBin, inputHeader string, cflags []string, matcher ClangMatcher) ([]interface{}, error) {
+func clangExec(ctx context.Context, clangBin, inputHeader string, cflags []string) ([]interface{}, error) {
 
 	clangArgs := []string{`-x`, `c++`}
 	clangArgs = append(clangArgs, cflags...)
 	clangArgs = append(clangArgs, `-Xclang`, `-ast-dump=json`, `-fsyntax-only`, inputHeader)
+
+	log.Printf("clang args: %s", clangArgs)
 
 	cmd := exec.CommandContext(ctx, clangBin, clangArgs...)
 	pr, err := cmd.StdoutPipe()
@@ -64,7 +66,7 @@ func clangExec(ctx context.Context, clangBin, inputHeader string, cflags []strin
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		inner, innerErr = clangStripUpToFile(pr, matcher)
+		inner, innerErr = clangStripUpToFile(pr)
 	}()
 
 	// Go documentation says: only call cmd.Wait once all reads from the
@@ -79,25 +81,16 @@ func clangExec(ctx context.Context, clangBin, inputHeader string, cflags []strin
 	return inner, innerErr
 }
 
-func mustClangExec(ctx context.Context, clangBin, inputHeader string, cflags []string, matcher ClangMatcher) []interface{} {
-
-	for i := 0; i < ClangMaxRetries; i++ {
-		astInner, err := clangExec(ctx, clangBin, inputHeader, cflags, matcher)
-		if err != nil {
-			// Log and continue with next retry
-			log.Printf("WARNING: Clang execution failed: %v", err)
-			time.Sleep(ClangRetryDelay)
-			log.Printf("Retrying...")
-			continue
-		}
-
-		// Success
-		return astInner
+func mustClangExec(ctx context.Context, clangBin, inputHeader string, cflags []string) []interface{} {
+	astInner, err := clangExec(ctx, clangBin, inputHeader, cflags)
+	if err != nil {
+		// Log and continue with next retry
+		log.Printf("WARNING: Clang execution failed: %v", err)
+		panic("Clang failed 5x parsing file " + inputHeader)
 	}
 
-	// Failed 5x
-	// Panic
-	panic("Clang failed 5x parsing file " + inputHeader)
+	// Success
+	return astInner
 }
 
 // clangStripUpToFile strips all AST nodes from the clang output until we find
@@ -105,7 +98,7 @@ func mustClangExec(ctx context.Context, clangBin, inputHeader string, cflags []s
 // This cleans out everything in the translation unit that came from an
 // #included file.
 // @ref https://stackoverflow.com/a/71128654
-func clangStripUpToFile(stdout io.Reader, matcher ClangMatcher) ([]interface{}, error) {
+func clangStripUpToFile(stdout io.Reader) ([]interface{}, error) {
 
 	var obj = map[string]interface{}{}
 	err := json.NewDecoder(stdout).Decode(&obj)
@@ -160,7 +153,7 @@ func clangStripUpToFile(stdout io.Reader, matcher ClangMatcher) ([]interface{}, 
 
 		// log.Printf("# name=%v kind=%v filename=%q\n", entry["name"], entry["kind"], match_filename)
 
-		if matcher(match_filename) {
+		if ClangMatchSameHeaderDefinitionOnly(match_filename) {
 			// Keep
 			ret = append(ret, entry)
 		}

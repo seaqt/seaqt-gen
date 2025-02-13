@@ -1,0 +1,8 @@
+[submodule "gen/qt-5.15"]
+	path = gen/qt-5.15
+	url = ./
+	branch = qt-5.15
+[submodule "gen/qt-6.4"]
+	path = gen/qt-6.4
+	url = ./
+	branch = qt-6.4
