@@ -250,7 +250,7 @@ func emitParametersCABI2CppForwarding(params []CppParameter, indent string, vtab
 		tmp = append(tmp, "vtbl")
 	}
 	for _, p := range params {
-		addPre, addFwd := emitCABI2CppForwarding(p, indent)
+		addPre, addFwd := emitCABI2CppForwarding(p, indent, false)
 		preamble += addPre
 		tmp = append(tmp, addFwd)
 	}
@@ -263,21 +263,25 @@ func makeNamePrefix(in string) string {
 	return replacer.Replace(in)
 }
 
-func emitCABI2CppForwarding(p CppParameter, indent string) (preamble string, forwarding string) {
+func emitCABI2CppForwarding(p CppParameter, indent string, delete bool) (preamble string, forwarding string) {
 
 	nameprefix := makeNamePrefix(p.cParameterName())
 
 	if p.ParameterType == "QString" {
 		// The CABI received parameter is a struct miqt_string, passed by value
 		// C++ needs it as a QString. Create one on the stack for automatic cleanup
-		// The caller will free the miqt_string
 		preamble += indent + "QString " + nameprefix + "_QString = QString::fromUtf8(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
+		if delete {
+			preamble += indent + "free(" + p.cParameterName() + ".data);\n"
+		}
 		return preamble, nameprefix + "_QString"
 
 	} else if p.ParameterType == "QByteArray" {
-		// The caller will free the miqt_string data
 		// This ctor makes a deep copy, on the stack which will be dtor'd by RAII
 		preamble += indent + "QByteArray " + nameprefix + "_QByteArray(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
+		if delete {
+			preamble += indent + "free(" + p.cParameterName() + ".data);\n"
+		}
 		return preamble, nameprefix + "_QByteArray"
 
 	} else if listType, ok := p.QListOf(); ok {
@@ -289,12 +293,15 @@ func emitCABI2CppForwarding(p CppParameter, indent string) (preamble string, for
 		preamble += indent + "for(size_t i = 0; i < " + p.cParameterName() + ".len; ++i) {\n"
 
 		listType.ParameterName = nameprefix + "_arr[i]"
-		addPre, addFwd := emitCABI2CppForwarding(listType, indent+"\t")
+		addPre, addFwd := emitCABI2CppForwarding(listType, indent+"\t", delete)
 		preamble += addPre
 		preamble += indent + "\t" + nameprefix + "_QList.push_back(" + addFwd + ");\n"
 
 		preamble += indent + "}\n"
 
+		if delete {
+			preamble += indent + "free(" + p.cParameterName() + ".data);\n"
+		}
 		// Support passing QList<>* (very rare, but used in qnetwork)
 		if p.Pointer {
 			return preamble, "&" + nameprefix + "_QList"
@@ -316,18 +323,23 @@ func emitCABI2CppForwarding(p CppParameter, indent string) (preamble string, for
 		preamble += indent + "for(size_t i = 0; i < " + p.cParameterName() + ".len; ++i) {\n"
 
 		kType.ParameterName = nameprefix + "_karr[i]"
-		addPreK, addFwdK := emitCABI2CppForwarding(kType, indent+"\t")
+		addPreK, addFwdK := emitCABI2CppForwarding(kType, indent+"\t", delete)
 		preamble += addPreK
 
 		vType.ParameterName = nameprefix + "_varr[i]"
-		addPreV, addFwdV := emitCABI2CppForwarding(vType, indent+"\t")
+		addPreV, addFwdV := emitCABI2CppForwarding(vType, indent+"\t", delete)
 		preamble += addPreV
 
 		preamble += indent + "\t" + nameprefix + "_QMap[" + addFwdK + "] = " + addFwdV + ";\n"
 
 		preamble += indent + "}\n"
-		return preamble, nameprefix + "_QMap"
 
+		if delete {
+			preamble += indent + "free(" + p.cParameterName() + ".keys);\n"
+			preamble += indent + "free(" + p.cParameterName() + ".values);\n"
+		}
+
+		return preamble, nameprefix + "_QMap"
 	} else if kType, vType, ok := p.QPairOf(); ok {
 		preamble += indent + p.GetQtCppType().ParameterType + " " + nameprefix + "_QPair;\n"
 
@@ -335,15 +347,20 @@ func emitCABI2CppForwarding(p CppParameter, indent string) (preamble string, for
 		preamble += indent + vType.RenderTypeCabi() + "* " + nameprefix + "_second_arr = static_cast<" + vType.RenderTypeCabi() + "*>(" + p.cParameterName() + ".values);\n"
 
 		kType.ParameterName = nameprefix + "_first_arr[0]"
-		addPreK, addFwdK := emitCABI2CppForwarding(kType, indent+"\t")
+		addPreK, addFwdK := emitCABI2CppForwarding(kType, indent+"\t", delete)
 		preamble += addPreK
 
 		vType.ParameterName = nameprefix + "_second_arr[0]"
-		addPreV, addFwdV := emitCABI2CppForwarding(vType, indent+"\t")
+		addPreV, addFwdV := emitCABI2CppForwarding(vType, indent+"\t", delete)
 		preamble += addPreV
 
 		preamble += indent + nameprefix + "_QPair.first = " + addFwdK + ";\n"
 		preamble += indent + nameprefix + "_QPair.second = " + addFwdV + ";\n"
+
+		if delete {
+			preamble += indent + "free(" + p.cParameterName() + ".keys);\n"
+			preamble += indent + "free(" + p.cParameterName() + ".values);\n"
+		}
 
 		return preamble, nameprefix + "_QPair"
 
@@ -402,6 +419,12 @@ func emitCABI2CppForwarding(p CppParameter, indent string) (preamble string, for
 		// Dereference the passed-in pointer
 		if strings.Contains(p.cParameterName(), `[`) {
 			return preamble, "*(" + p.cParameterName() + ")" // Extra brackets aren't necessary, just nice
+		}
+
+		if delete {
+			preamble += indent + "auto " + nameprefix + "_Value = std::move(*" + p.cParameterName() + ");\n"
+			preamble += indent + "delete " + nameprefix + ";\n"
+			return preamble, nameprefix + "_Value"
 		}
 		return preamble, "*" + p.cParameterName()
 
@@ -1039,7 +1062,7 @@ extern "C" {
 						maybeReturn2 = m.ReturnType.RenderTypeCabi() + " callback_return_value = "
 						returnParam := m.ReturnType // copy
 						returnParam.ParameterName = "callback_return_value"
-						returnTransformP, returnTransformF = emitCABI2CppForwarding(returnParam, "\t\t")
+						returnTransformP, returnTransformF = emitCABI2CppForwarding(returnParam, "\t\t", true)
 					}
 
 					// In the case of method overloads, we always need to use the
