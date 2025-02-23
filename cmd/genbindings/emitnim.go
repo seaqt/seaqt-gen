@@ -507,7 +507,7 @@ func (gfs *nimFileState) emitParametersNim2CABIForwarding(m CppMethod) (preamble
 			skipNext = false
 
 		} else {
-			addPreamble, rvalue := gfs.emitParameterNim2CABIForwarding(p)
+			addPreamble, rvalue := gfs.emitParameterNim2CABIForwarding(p, false)
 			preamble += addPreamble
 			tmp = append(tmp, rvalue)
 		}
@@ -516,32 +516,49 @@ func (gfs *nimFileState) emitParametersNim2CABIForwarding(m CppMethod) (preamble
 	return preamble, strings.Join(tmp, ", ")
 }
 
-func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter) (preamble string, rvalue string) {
+func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter, copy bool) (preamble, rvalue string) {
+	// If transfer is true, memory ownership is given to CABI (this happens when p is a return value)
+
 	nameprefix := makeNamePrefix(p.nimParameterName())
 
 	if p.ParameterType == "QString" {
+		if copy {
+			preamble += gfs.ind + "var " + nameprefix + "_copy = cast[cstring](if len(" + p.nimParameterName() + ") > 0: c_malloc(csize_t(len(" + p.nimParameterName() + "))) else: nil)\n"
+			preamble += gfs.ind + "if len(" + p.nimParameterName() + ") > 0: copyMem(cast[pointer](" + nameprefix + "_copy), addr " + p.nimParameterName() + "[0], csize_t(len(" + p.nimParameterName() + ")))\n"
+			rvalue = "struct_miqt_string(data: " + nameprefix + "_copy, len: csize_t(len(" + p.nimParameterName() + ")))"
+		} else {
+			rvalue = "struct_miqt_string(data: " + p.nimParameterName() + ", len: csize_t(len(" + p.nimParameterName() + ")))"
+		}
 		// Go: convert string -> miqt_string*
 		// CABI: convert miqt_string* -> real QString
-		rvalue = "struct_miqt_string(data: " + p.nimParameterName() + ", len: csize_t(len(" + p.nimParameterName() + ")))"
 
 	} else if p.ParameterType == "QByteArray" {
 		// Go: convert []byte -> miqt_string
 		// CABI: convert miqt_string -> QByteArray
 		// n.b. This can ALIAS the existing []byte data
 
-		rvalue = "struct_miqt_string(data: cast[cstring](if len(" + p.nimParameterName() + ") == 0: nil else: unsafeAddr " + p.nimParameterName() + "[0]), len: csize_t(len(" + p.nimParameterName() + ")))"
-
+		if copy {
+			preamble += gfs.ind + "var " + nameprefix + "_copy = cast[cstring](if len(" + p.nimParameterName() + ") > 0: c_malloc(csize_t(len(" + p.nimParameterName() + "))) else: nil)\n"
+			preamble += gfs.ind + "if len(" + p.nimParameterName() + ") > 0: copyMem(cast[pointer](" + nameprefix + "_copy), addr " + p.nimParameterName() + "[0], csize_t(len(" + p.nimParameterName() + ")))\n"
+			rvalue = "struct_miqt_string(data: " + nameprefix + "_copy, len: csize_t(len(" + p.nimParameterName() + ")))"
+		} else {
+			rvalue = "struct_miqt_string(data: cast[cstring](if len(" + p.nimParameterName() + ") == 0: nil else: unsafeAddr " + p.nimParameterName() + "[0]), len: csize_t(len(" + p.nimParameterName() + ")))"
+		}
 	} else if listType, ok := p.QListOf(); ok {
 		// QList<T>
 		// Go: convert T[] -> t* and len
 		// CABI: create a real QList<>
+		if copy {
+			preamble += gfs.ind + "var " + nameprefix + "_CArray = cast[ptr UncheckedArray[" + listType.parameterTypeNim(gfs) + "]](if len(" + p.nimParameterName() + ") > 0: c_malloc(c_sizet(sizeof(" + listType.parameterTypeNim(gfs) + ") * len(" + p.nimParameterName() + "))) else: nil)\n"
+		} else {
+			preamble += gfs.ind + "var " + nameprefix + "_CArray = newSeq[" + listType.parameterTypeNim(gfs) + "](len(" + p.nimParameterName() + "))\n"
+		}
 
-		preamble += gfs.ind + "var " + nameprefix + "_CArray = newSeq[" + listType.parameterTypeNim(gfs) + "](len(" + p.nimParameterName() + "))\n"
 		preamble += gfs.ind + "for i in 0..<len(" + p.nimParameterName() + "):\n"
 		gfs.indent()
 
 		listType.ParameterName = p.nimParameterName() + "[i]"
-		addPreamble, innerRvalue := gfs.emitParameterNim2CABIForwarding(listType)
+		addPreamble, innerRvalue := gfs.emitParameterNim2CABIForwarding(listType, copy)
 		preamble += addPreamble
 		preamble += gfs.ind + nameprefix + "_CArray[i] = " + innerRvalue + "\n"
 		preamble += "\n"
@@ -555,20 +572,24 @@ func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter) (preamb
 	} else if kType, vType, ok := p.QMapOf(); ok {
 		// QMap<T>
 
-		preamble += gfs.ind + "var " + nameprefix + "_Keys_CArray = newSeq[" + kType.parameterTypeNim(gfs) + "](len(" + p.nimParameterName() + "))\n"
-		preamble += gfs.ind + "var " + nameprefix + "_Values_CArray = newSeq[" + vType.parameterTypeNim(gfs) + "](len(" + p.nimParameterName() + "))\n"
-
+		if copy {
+			preamble += gfs.ind + "var " + nameprefix + "_Keys_CArray = cast[ptr UncheckedArray[" + kType.parameterTypeNim(gfs) + "]](if len(" + p.nimParameterName() + ") > 0: c_malloc(csize_t(sizeof(" + kType.parameterTypeNim(gfs) + ") * len(" + p.nimParameterName() + "))) else: nil)\n"
+			preamble += gfs.ind + "var " + nameprefix + "_Values_CArray = cast[ptr UncheckedArray[" + vType.parameterTypeNim(gfs) + "]](if len(" + p.nimParameterName() + ") > 0: c_malloc(csize_t(sizeof(" + vType.parameterTypeNim(gfs) + ") * len(" + p.nimParameterName() + "))) else: nil)\n"
+		} else {
+			preamble += gfs.ind + "var " + nameprefix + "_Keys_CArray = newSeq[" + kType.parameterTypeNim(gfs) + "](len(" + p.nimParameterName() + "))\n"
+			preamble += gfs.ind + "var " + nameprefix + "_Values_CArray = newSeq[" + vType.parameterTypeNim(gfs) + "](len(" + p.nimParameterName() + "))\n"
+		}
 		preamble += gfs.ind + "var " + nameprefix + "_ctr = 0\n"
 
-		preamble += gfs.ind + "for " + nameprefix + "k, " + nameprefix + "v in " + p.nimParameterName() + ":\n"
+		preamble += gfs.ind + "for " + nameprefix + "_k, " + nameprefix + "_v in " + p.nimParameterName() + ":\n"
 		gfs.indent()
 		kType.ParameterName = nameprefix + "_k"
-		addPreamble, innerRvalue := gfs.emitParameterNim2CABIForwarding(kType)
+		addPreamble, innerRvalue := gfs.emitParameterNim2CABIForwarding(kType, copy)
 		preamble += addPreamble
 		preamble += gfs.ind + nameprefix + "_Keys_CArray[" + nameprefix + "_ctr] = " + innerRvalue + "\n"
 
 		vType.ParameterName = nameprefix + "_v"
-		addPreamble, innerRvalue = gfs.emitParameterNim2CABIForwarding(vType)
+		addPreamble, innerRvalue = gfs.emitParameterNim2CABIForwarding(vType, copy)
 		preamble += addPreamble
 		preamble += gfs.ind + nameprefix + "_Values_CArray[" + nameprefix + "_ctr] = " + innerRvalue + "\n"
 
@@ -586,12 +607,12 @@ func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter) (preamb
 		preamble += gfs.ind + "var " + nameprefix + "_CArray_Second: " + vType.parameterTypeNim(gfs) + "\n"
 
 		kType.ParameterName = p.nimParameterName() + ".first"
-		addPreamble, innerRvalue := gfs.emitParameterNim2CABIForwarding(kType)
+		addPreamble, innerRvalue := gfs.emitParameterNim2CABIForwarding(kType, copy)
 		preamble += addPreamble
 		preamble += gfs.ind + nameprefix + "_CArray_First = " + innerRvalue + "\n"
 
 		vType.ParameterName = p.nimParameterName() + ".second"
-		addPreamble, innerRvalue = gfs.emitParameterNim2CABIForwarding(vType)
+		addPreamble, innerRvalue = gfs.emitParameterNim2CABIForwarding(vType, copy)
 		preamble += addPreamble
 		preamble += gfs.ind + nameprefix + "_CArray_Second = " + innerRvalue + "\n"
 
@@ -676,6 +697,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 		gfs.indent()
 		lines += gfs.emitCabiToNim(namePrefix+"x_ret[i] = ", t, namePrefix+"_outCast[i]")
 		gfs.dedent()
+		lines += gfs.ind + "c_free(" + namePrefix + "_ma.data)\n"
 		lines += gfs.ind + assignExpr + namePrefix + "x_ret\n"
 
 	} else if t, ok := rt.QSetOf(); ok {
@@ -703,6 +725,8 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 		lines += gfs.emitCabiToNim("var "+namePrefix+"_entry_Value = ", vType, namePrefix+"_Values[i]") + "\n"
 		lines += gfs.ind + namePrefix + "x_ret[" + namePrefix + "_entry_Key] = " + namePrefix + "_entry_Value\n"
 		gfs.dedent()
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.keys)\n"
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.values)\n"
 
 		lines += gfs.ind + assignExpr + namePrefix + "x_ret\n"
 
@@ -714,6 +738,9 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 
 		lines += gfs.emitCabiToNim("var "+namePrefix+"_entry_First = ", kType, namePrefix+"_First_CArray[0]") + "\n"
 		lines += gfs.emitCabiToNim("var "+namePrefix+"_entry_Second = ", vType, namePrefix+"_Second_CArray[0]") + "\n"
+
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.keys)\n"
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.values)\n"
 
 		lines += gfs.ind + assignExpr + "(first: " + namePrefix + "_entry_First , second: " + namePrefix + "_entry_Second )\n"
 
@@ -794,7 +821,7 @@ func emitNim(src *CppParsedHeader, headerName string, packageName string, pkgCon
 
 {.push raises: [].}
 
-from system/ansi_c import c_free
+from system/ansi_c import c_free, c_malloc
 
 type
   struct_miqt_string {.used.} = object
@@ -1176,7 +1203,7 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 						ret.WriteString(gfs.ind + `var virtualReturn = vtbl[].` + m.rawMethodName() + `(` + strings.Join(paramNames, `, `) + ")\n")
 						virtualRetP := m.ReturnType // copy
 						virtualRetP.ParameterName = "virtualReturn"
-						binding, rvalue := gfs.emitParameterNim2CABIForwarding(virtualRetP)
+						binding, rvalue := gfs.emitParameterNim2CABIForwarding(virtualRetP, true)
 						ret.WriteString(binding)
 						ret.WriteString(gfs.ind + rvalue + "\n\n")
 					}
