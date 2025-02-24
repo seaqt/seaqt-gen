@@ -697,6 +697,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 		gfs.indent()
 		lines += gfs.emitCabiToNim(namePrefix+"x_ret[i] = ", t, namePrefix+"_outCast[i]")
 		gfs.dedent()
+		lines += gfs.ind + "c_free(" + namePrefix + "_ma.data)\n"
 		lines += gfs.ind + assignExpr + namePrefix + "x_ret\n"
 
 	} else if t, ok := rt.QSetOf(); ok {
@@ -724,6 +725,8 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 		lines += gfs.emitCabiToNim("var "+namePrefix+"_entry_Value = ", vType, namePrefix+"_Values[i]") + "\n"
 		lines += gfs.ind + namePrefix + "x_ret[" + namePrefix + "_entry_Key] = " + namePrefix + "_entry_Value\n"
 		gfs.dedent()
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.keys)\n"
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.values)\n"
 
 		lines += gfs.ind + assignExpr + namePrefix + "x_ret\n"
 
@@ -735,6 +738,9 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 
 		lines += gfs.emitCabiToNim("var "+namePrefix+"_entry_First = ", kType, namePrefix+"_First_CArray[0]") + "\n"
 		lines += gfs.emitCabiToNim("var "+namePrefix+"_entry_Second = ", vType, namePrefix+"_Second_CArray[0]") + "\n"
+
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.keys)\n"
+		lines += gfs.ind + "c_free(" + namePrefix + "_mm.values)\n"
 
 		lines += gfs.ind + assignExpr + "(first: " + namePrefix + "_entry_First , second: " + namePrefix + "_entry_Second )\n"
 
