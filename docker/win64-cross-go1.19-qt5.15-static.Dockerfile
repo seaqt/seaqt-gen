@@ -8,7 +8,7 @@ RUN DEBIAN_FRONTEND=noninteractive \
     echo "deb https://pkg.mxe.cc/repos/apt buster main" >/etc/apt/sources.list.d/mxeapt.list && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 86B72ED9 && \
     apt-get update && \
-    apt-get install -qyy mxe-x86-64-w64-mingw32.static-qt5 && \
+    apt-get install -qyy mxe-x86-64-w64-mingw32.static-qt5 git && \
     apt-get clean
 
 ENV PATH=/usr/lib/mxe/usr/bin:$PATH
