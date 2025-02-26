@@ -14,7 +14,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 		bzip2 \
 		ca-certificates \
 		curl \
-		pkg-config && \
+		pkg-config git && \
     apt-get clean
 
 ENV PATH="/osxcross/bin:$PATH"
