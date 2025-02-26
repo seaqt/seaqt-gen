@@ -37,7 +37,7 @@ jobs:
       with:
         submodules: true
 
-    - name: Linux Qt5 compile test
+    - name: Linux64 C bindings compile and test
       run: |
         make test-gen-5.15
 
@@ -50,9 +50,49 @@ jobs:
       with:
         submodules: true
 
-    - name: Linux Qt6 compile test
+    - name: Linux64 C bindings compile and test
       run: |
         make test-gen-6.4
+
+  miqt_linux64_qt5_nim:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+    - uses: nim-lang/setup-nimble-action@v1
+      with:
+        nimble-version: '0.16.4' # default is 'latest'
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Linux64 docker build
+      run: docker build -t miqt/linux64:qt5 -f docker/linux64-go1.19-qt5.15-dynamic.Dockerfile .
+
+    - name: Linux64 Nim bindings compile and test
+      run: |
+        cp $(which nimble) $PWD
+        docker run -v $PWD:/src -w /src miqt/linux64:qt5 /bin/bash -c 'git config --global --add safe.directory "*" && cd examples && QT_QPA_PLATFORM=offscreen ../nimble test515'
+
+  miqt_linux64_qt6_nim:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+    - uses: nim-lang/setup-nimble-action@v1
+      with:
+        nimble-version: '0.16.4' # default is 'latest'
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Linux64 docker build
+      run: docker build -t miqt/linux64:qt6 -f docker/linux64-go1.19-qt6.4-dynamic.Dockerfile .
+
+    - name: Linux64 Nim bindings compile and test
+      run: |
+        cp $(which nimble) $PWD
+        docker run -v $PWD:/src -w /src miqt/linux64:qt6 /bin/bash -c 'git config --global --add safe.directory "*" && cd examples && QT_QPA_PLATFORM=offscreen ../nimble test64'
 
   # miqt_linux64_qt6_4:
   #   runs-on: ubuntu-24.04
