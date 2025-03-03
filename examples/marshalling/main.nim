@@ -1,7 +1,7 @@
 import
   std/[sequtils, tables],
   unittest2,
-  seeqt/[
+  seaqt/[
     qaction, qapplication, qcheckbox, qfile, qinputdialog, qjsonobject, qkeysequence,
     qsize, qvariant, qversionnumber,
   ]
