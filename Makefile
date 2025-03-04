@@ -32,6 +32,13 @@ reset-gen:
 		git -C $$name reset --hard $$(git -C $$name rev-list --max-parents=0 HEAD); \
 	done
 
+reset-gen-nim:
+	git submodule update --init --recursive
+	for name in gen/nim-seaqt-*; do \
+		git -C $$name switch $$(git config -f .gitmodules submodule.$$name.branch); \
+		git -C $$name reset --hard $$(git -C $$name rev-list --max-parents=0 HEAD); \
+	done
+
 .PHONY: copy-libseaqt
 copy-libseaqt: | genbindings
 	cd gen/ ;\
