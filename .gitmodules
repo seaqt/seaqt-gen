@@ -6,3 +6,11 @@
 	path = gen/seaqt-6.4
 	url = https://github.com/seaqt/seaqt.git
 	branch = qt-6.4
+[submodule "gen/nim-seaqt-5.15"]
+	path = gen/nim-seaqt-5.15
+	url = https://github.com/seaqt/nim-seaqt.git
+	branch = qt-5.15
+[submodule "gen/nim-seaqt-6.4"]
+	path = gen/nim-seaqt-6.4
+	url = https://github.com/seaqt/nim-seaqt.git
+	branch = qt-6.4

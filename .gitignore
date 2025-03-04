@@ -52,3 +52,7 @@ deployment-settings.json
 
 # IDE / LSP files
 compile_flags.txt
+
+# Tests
+main
+
