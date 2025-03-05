@@ -74,6 +74,10 @@ func cppSubclassName(c CppClass) string {
 	return "Virtual" + strings.Replace(c.ClassName, `::`, ``, -1)
 }
 
+func cabiStaticMetaObjectName(c CppClass) string {
+	return cabiClassName(c.ClassName) + `_staticMetaObject`
+}
+
 func (p CppParameter) RenderTypeCabi() string {
 
 	if p.ParameterType == "QString" {
@@ -870,6 +874,12 @@ extern "C" {
 			}
 		}
 
+		for _, p := range c.Props {
+			if p.PropertyName == "staticMetaObject" {
+				ret.WriteString(fmt.Sprintf("const QMetaObject* %s();\n", cabiStaticMetaObjectName(c)))
+			}
+		}
+
 		// delete
 		if c.CanDelete {
 			ret.WriteString(fmt.Sprintf("void %s(%s* self);\n", cabiDeleteName(c), className))
@@ -1370,7 +1380,12 @@ extern "C" {
 				)
 
 			}
+		}
 
+		for _, p := range c.Props {
+			if p.PropertyName == "staticMetaObject" {
+				ret.WriteString(fmt.Sprintf("const QMetaObject* %s() { return &%s::staticMetaObject; }\n", cabiStaticMetaObjectName(c), c.ClassName))
+			}
 		}
 
 		if len(virtualMethods) > 0 {

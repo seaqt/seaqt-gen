@@ -29,7 +29,7 @@ clean:
 
 .PHONY: genbindings
 genbindings: $(BUILDSTAMPS)
-	$(DOCKEREXEC) 'cd cmd/genbindings && go build && ./genbindings'
+	$(DOCKEREXEC) 'cd cmd/genbindings && go build && ./genbindings' 2>log.txt
 
 copy-libseaqt: genbindings
 	cd gen/ ;\

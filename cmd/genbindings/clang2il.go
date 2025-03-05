@@ -495,6 +495,21 @@ nextMethod:
 
 			ret.Methods = append(ret.Methods, mm)
 
+		case "VarDecl":
+			varName, ok := node["name"].(string)
+			if !ok {
+				return CppClass{}, errors.New("variable has no name")
+			}
+
+			if varName == "staticMetaObject" {
+				ret.Props = append(ret.Props, CppProperty{
+					PropertyName: varName,
+					PropertyType: "QMetaObject",
+					IsStatic:     true})
+			} else {
+				log.Printf("==> NOT IMPLEMENTED VarDecl %q %s\n", kind, varName)
+			}
+
 		default:
 			log.Printf("==> NOT IMPLEMENTED %q\n", kind)
 		}
