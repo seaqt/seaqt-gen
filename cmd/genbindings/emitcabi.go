@@ -74,6 +74,10 @@ func cppSubclassName(c CppClass) string {
 	return "Virtual" + strings.Replace(c.ClassName, `::`, ``, -1)
 }
 
+func cabiStaticMetaObjectName(c CppClass) string {
+	return cabiClassName(c.ClassName) + `_staticMetaObject`
+}
+
 func (p CppParameter) RenderTypeCabi() string {
 
 	if p.ParameterType == "QString" {
@@ -727,6 +731,12 @@ func getReferencedTypes(src *CppParsedHeader) []string {
 				ParameterType: cn.Class.ClassName,
 			})
 		}
+
+		for _, p := range c.Props {
+			if p.PropertyName == "staticMetaObject" {
+				foundTypes["QMetaObject"] = struct{}{}
+			}
+		}
 	}
 
 	// Some types (e.g. QRgb) are found but are typedefs, not classes
@@ -898,6 +908,12 @@ extern "C" {
 
 		for _, m := range c.PrivateSignals {
 			ret.WriteString(fmt.Sprintf("%s %s(%s* self, intptr_t slot);\n", m.ReturnType.RenderTypeCabi(), cabiConnectName(c, m), className))
+		}
+
+		for _, p := range c.Props {
+			if p.PropertyName == "staticMetaObject" {
+				ret.WriteString(fmt.Sprintf("const QMetaObject* %s();\n", cabiStaticMetaObjectName(c)))
+			}
 		}
 
 		// delete
@@ -1423,7 +1439,12 @@ extern "C" {
 				)
 
 			}
+		}
 
+		for _, p := range c.Props {
+			if p.PropertyName == "staticMetaObject" {
+				ret.WriteString(fmt.Sprintf("const QMetaObject* %s() { return &%s::staticMetaObject; }\n", cabiStaticMetaObjectName(c), c.ClassName))
+			}
 		}
 
 		if len(virtualMethods) > 0 {
