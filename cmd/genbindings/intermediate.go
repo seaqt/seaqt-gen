@@ -234,6 +234,7 @@ func (p CppParameter) Void() bool {
 type CppProperty struct {
 	PropertyName string
 	PropertyType string
+	IsStatic     bool
 	Visibility   string
 }
 
@@ -438,9 +439,6 @@ func (c *CppClass) VirtualMethods() []CppMethod {
 		if m.IsSignal {
 			continue
 		}
-		if !AllowVirtual(m) {
-			continue
-		}
 
 		ret = append(ret, m)
 		retNames[m.CppCallTarget()] = struct{}{}
@@ -469,9 +467,7 @@ func (c *CppClass) VirtualMethods() []CppMethod {
 			if m.IsSignal {
 				continue
 			}
-			if !AllowVirtual(m) {
-				continue
-			}
+
 			if _, ok := retNames[m.CppCallTarget()]; ok {
 				continue // Already found in a child class
 			}

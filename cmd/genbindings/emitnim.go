@@ -1167,6 +1167,19 @@ proc ` + cabiCallbackName(c, m) + `(self: ptr ` + rawClassName + `, slot: int` +
 			}
 		}
 
+		for _, p := range c.Props {
+			gfs.imports[gfs.qualifiedPrefix("QtCore")+"gen_qobjectdefs_types"] = struct{}{}
+
+			if p.PropertyName == "staticMetaObject" {
+				fmt.Fprintf(&cabi, `proc fc%[1]s(): pointer {.importc: "%[1]s".}
+`, cabiStaticMetaObjectName(c))
+
+				fmt.Fprintf(&ret, `proc staticMetaObject*(_: type %s): gen_qobjectdefs_types.QMetaObject =
+  gen_qobjectdefs_types.QMetaObject(h: fc%s())
+`, nimPkgClassName, cabiStaticMetaObjectName(c))
+			}
+		}
+
 		if c.CanDelete {
 			cabi.WriteString(`proc ` + ncabiDeleteName(c) + `(self: pointer) {.importc: "` + cabiDeleteName(c) + `".}
 `)
