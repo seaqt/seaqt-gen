@@ -29,7 +29,7 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 			"Core", "Gui", "Widgets", "Network", "Multimedia", "MultimediaWidgets",
 
 			// https://doc.qt.io/qt-5/qtmodules.html#qt-add-ons
-			"PrintSupport", "Script", "Svg", "WebChannel",
+			"PrintSupport", "Svg", "WebChannel",
 			"WebEngineCore",
 
 			"Qml", "Quick",
