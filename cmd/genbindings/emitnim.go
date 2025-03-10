@@ -213,6 +213,10 @@ func ncabiProtectedBaseName(c CppClass, m CppMethod) string {
 	return "f" + cabiClassNameNim(c.ClassName, true) + `_protectedbase_` + m.SafeMethodName()
 }
 
+func isQObject(s string) bool {
+	return s == "QObject"
+}
+
 func (e CppEnum) nimEnumName() string {
 	enumName := cabiClassNameNim(ifv(strings.HasSuffix(e.EnumName, "::"), e.EnumName+"Enum", e.EnumName), false) // Fully qualified name of the enum itself
 	// if _, ok := KnownClassnames[enumName]; ok {
@@ -967,8 +971,6 @@ export ` + pkg.UnitName + `_types
 
 				types.WriteString(`proc ` + ncabiDeleteName(c) + `(self: pointer) {.importc: "` + cabiDeleteName(c) + `".}
 `)
-				// TODO
-
 				types.WriteString("proc `=destroy`(self: var " + nimClassName + `) =
   if self.owned: ` + ncabiDeleteName(c) + `(self.h)
 
@@ -990,7 +992,15 @@ export ` + pkg.UnitName + `_types
   ` + ncabiDeleteName(c) + `(h)
 
 `)
+				if isQObject(c.ClassName) {
+					types.WriteString(`proc fcQObject_deleteLater(self: pointer) {.importc: "QObject_deleteLater".}
+proc deleteLater*(self: sink ` + nimClassName + `) =
+  let h = self.h
+  wasMoved(self)
+  fcQObject_deleteLater(h)
 
+`)
+				}
 			}
 		} else {
 			// https://github.com/nim-lang/Nim/issues/24760
@@ -1127,6 +1137,10 @@ export ` + gfs.currentUnitName + `_types
 		for _, m := range c.Methods {
 			if m.IsProtected {
 				continue // Don't add a direct call for it
+			}
+
+			if m.MethodName == "deleteLater" && c.ClassName == "QObject" {
+				continue // already in ..._types
 			}
 
 			preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m)
