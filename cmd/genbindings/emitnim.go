@@ -981,6 +981,7 @@ export ` + pkg.UnitName + `_types
 
 `)
 				// TODO copy constructors
+				// https://github.com/nim-lang/Nim/issues/24760
 				types.WriteString("proc `=copy`(dest: var " + nimClassName + ", source: " + nimClassName + ") {.error.}\n")
 
 				types.WriteString(`proc delete*(self: sink ` + nimClassName + `) =
@@ -991,8 +992,21 @@ export ` + pkg.UnitName + `_types
 `)
 
 			}
+		} else {
+			// https://github.com/nim-lang/Nim/issues/24760
+			types.WriteString("proc `=copy`(dest: var " + nimClassName + ", source: " + nimClassName + ") {.error.}\n")
 
+			// https://github.com/nim-lang/Nim/issues/24762
+			// https://github.com/nim-lang/Nim/issues/24764
+			types.WriteString(`proc ` + "`=sink`" + `(dest: var ` + nimClassName + `, source: ` + nimClassName + `) =
+  ` + "`=destroy`" + `(dest)
+  wasMoved(dest)
+  dest.h = source.h
+  dest.owned = source.owned
+
+`)
 		}
+
 	}
 
 	if !hasCompile {
