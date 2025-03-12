@@ -17,7 +17,7 @@ func cppComment(s string) string {
 func cReservedWord(s string) bool {
 	// parameter names that appear as properties in Qt, for example
 	switch s {
-	case "default": // not language-reserved words, but a binding-reserved words
+	case "default", "vtbl", "vdata": // not language-reserved words, but a binding-reserved words
 		return true
 	default:
 		return false
@@ -62,16 +62,28 @@ func cabiProtectedBaseName(c CppClass, m CppMethod) string {
 	return cabiClassName(c.ClassName) + `_protectedbase_` + m.SafeMethodName()
 }
 
-func cabiOverrideVirtualName(c CppClass, m CppMethod) string {
-	return cabiClassName(c.ClassName) + `_override_virtual_` + m.SafeMethodName()
-}
-
 func cppSubclassName(c CppClass) string {
 	return "Virtual" + strings.Replace(c.ClassName, `::`, ``, -1)
 }
 
 func cabiStaticMetaObjectName(c CppClass) string {
 	return cabiClassName(c.ClassName) + `_staticMetaObject`
+}
+
+func cabiVtableStructName(c CppClass) string {
+	return cabiClassName(c.ClassName) + `_VTable`
+}
+
+func cabiVTableName(c CppClass) string {
+	return cabiClassName(c.ClassName) + `_vtbl`
+}
+
+func cabiVdataName(c CppClass) string {
+	return cabiClassName(c.ClassName) + `_vdata`
+}
+
+func cabiSetVdataName(c CppClass) string {
+	return cabiClassName(c.ClassName) + `_setVdata`
 }
 
 func (p CppParameter) RenderTypeCabi() string {
@@ -205,7 +217,8 @@ func (p CppParameter) RenderTypeIntermediateCpp() string {
 func emitParametersCpp(m CppMethod, vtable string) string {
 	tmp := make([]string, 0, len(m.Parameters))
 	if len(vtable) > 0 {
-		tmp = append(tmp, vtable+"* vtbl")
+		tmp = append(tmp, "const "+vtable+"* vtbl")
+		tmp = append(tmp, "void* vdata")
 	}
 	for _, p := range m.Parameters {
 		tmp = append(tmp, p.RenderTypeQtCpp()+" "+p.cParameterName())
@@ -256,6 +269,7 @@ func emitParametersCABI2CppForwarding(params []CppParameter, indent string, vtab
 
 	if vtable {
 		tmp = append(tmp, "vtbl")
+		tmp = append(tmp, "vdata")
 	}
 	for _, p := range params {
 		addPre, addFwd := emitCABI2CppForwarding(p, indent, false)
@@ -868,19 +882,28 @@ extern "C" {
 		className := cabiClassName(c.ClassName)
 		virtualMethods := c.VirtualMethods()
 		protectedMethods := c.ProtectedMethods()
+		derivedName := ifv(len(virtualMethods) > 0, cppSubclassName(c), cabiClassName(c.ClassName))
 
 		if len(virtualMethods) > 0 {
-			ret.WriteString(`struct ` + className + `_VTable {
+			ret.WriteString(`typedef struct ` + cppSubclassName(c) + ` ` + cppSubclassName(c) + ";\n")
+			ret.WriteString(`typedef struct ` + cabiVtableStructName(c) + `{
 `)
-			fmt.Fprintf(&ret, "	void (*destructor)(struct %s_VTable* vtbl, %s* self);\n", className, className)
+			fmt.Fprintf(&ret, "	void (*destructor)(%s* self);\n", cppSubclassName(c))
 			for _, m := range virtualMethods {
-				ret.WriteString(fmt.Sprintf("	%s (*%s)(struct %s_VTable* vtbl, %s);\n", m.ReturnType.RenderTypeCabi(), m.SafeMethodName(), className, emitParametersCabi(m, ifv(m.IsConst, "const ", "")+className+"*")))
+				ret.WriteString(fmt.Sprintf("	%s (*%s)(%s);\n", m.ReturnType.RenderTypeCabi(), m.SafeMethodName(), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+cppSubclassName(c)+"*")))
 			}
-			ret.WriteString("};\n")
+			ret.WriteString("}" + cabiVtableStructName(c) + ";\n\n")
+
+			ret.WriteString("const " + cabiVtableStructName(c) + "* " + cabiVTableName(c) + "(const " + derivedName + "* self);\n" +
+				"void* " + cabiVdataName(c) + "(const " + derivedName + "* self);\n" +
+				"void " + cabiSetVdataName(c) + "(" + derivedName + "* self, void* vdata);\n\n")
 		}
 
 		for i, ctor := range c.Ctors {
-			ret.WriteString(fmt.Sprintf("%s* %s(%s);\n", className, cabiNewName(c, i), emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0)))
+			ret.WriteString(fmt.Sprintf("%s* %s(%s);\n", derivedName, cabiNewName(c, i), emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0)))
+		}
+		if len(c.Ctors) > 0 {
+			ret.WriteString("\n")
 		}
 
 		if len(c.DirectInheritClassInfo()) > 0 {
@@ -893,29 +916,41 @@ extern "C" {
 			ret.WriteString(");\n")
 		}
 
-		for _, m := range c.Methods {
-			if m.IsProtected && !m.IsVirtual {
-				continue // Can't call directly, have to go through our wrapper
-			}
-
-			ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiMethodName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+className+"*")))
-
-			if m.IsSignal {
-				callbackParams := "intptr_t"
-
-				for _, p := range m.Parameters {
-					callbackParams += ", " + p.RenderTypeCabi()
+		if len(c.Methods) > 0 {
+			for _, m := range c.Methods {
+				if m.IsProtected && !m.IsVirtual {
+					continue // Can't call directly, have to go through our wrapper
 				}
-				ret.WriteString(fmt.Sprintf("%s %s(%s* self, intptr_t slot, void (*callback)(%s), void (*release)(intptr_t));\n", m.ReturnType.RenderTypeCabi(), cabiConnectName(c, m), className, callbackParams))
+
+				ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiMethodName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+className+"*")))
+
+				if m.IsSignal {
+					callbackParams := "intptr_t"
+
+					for _, p := range m.Parameters {
+						callbackParams += ", " + p.RenderTypeCabi()
+					}
+					ret.WriteString(fmt.Sprintf("%s %s(%s* self, intptr_t slot, void (*callback)(%s), void (*release)(intptr_t));\n", m.ReturnType.RenderTypeCabi(), cabiConnectName(c, m), derivedName, callbackParams))
+				}
 			}
+
+			ret.WriteString("\n")
 		}
 
-		for _, m := range virtualMethods {
-			ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiVirtualBaseName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void" /*className*/ +"*")))
-		}
 		if len(virtualMethods) > 0 {
-			for _, m := range protectedMethods {
-				ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiProtectedBaseName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void" /*className*/ +"*")))
+
+			for _, m := range virtualMethods {
+				ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiVirtualBaseName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+derivedName+"*")))
+			}
+
+			ret.WriteString("\n")
+
+			if len(protectedMethods) > 0 {
+				for _, m := range protectedMethods {
+					ret.WriteString(fmt.Sprintf("%s %s(%s);\n", m.ReturnType.RenderTypeCabi(), cabiProtectedBaseName(c, m), emitParametersCabi(m, ifv(m.IsConst, "const ", "")+derivedName+"*")))
+				}
+
+				ret.WriteString("\n")
 			}
 		}
 		for _, p := range c.Props {
@@ -951,7 +986,8 @@ func emitParametersCabiConstructor(c *CppClass, ctor *CppMethod, vtable bool) st
 
 	slist := make([]string, 0, len(ctor.Parameters))
 	if vtable {
-		slist = append(slist, "struct "+c.ClassName+"_VTable* vtbl")
+		slist = append(slist, "const "+cabiVtableStructName(*c)+"* vtbl")
+		slist = append(slist, "void* vdata")
 	}
 	for _, p := range ctor.Parameters {
 		slist = append(slist, p.RenderTypeCabi()+" "+p.cParameterName())
@@ -997,30 +1033,6 @@ func emitBindingCpp(src *CppParsedHeader, filename string) (string, error) {
 		ret.WriteString(`#if ` + platformRestriction.CxxIf() + "\n\n")
 	}
 
-	// Write prototypes for functions that the host language bindings should export
-	// for virtual function overrides
-
-	ret.WriteString(`
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-`)
-
-	for _, c := range src.Classes {
-		for _, m := range c.Methods {
-			if m.IsSignal {
-			}
-		}
-	}
-
-	ret.WriteString(
-		`#ifdef __cplusplus
-} /* extern C */
-#endif
-
-`)
-
 	for _, c := range src.Classes {
 
 		methodPrefixName := cabiClassName(c.ClassName)
@@ -1029,32 +1041,37 @@ extern "C" {
 		protectedMethods := c.ProtectedMethods()
 
 		if len(virtualMethods) > 0 {
-			overriddenClassName := cppSubclassName(c)
+			subclassName := cppSubclassName(c)
+			vtableStructName := cabiVtableStructName(c)
 
-			ret.WriteString("class " + overriddenClassName + " final : public " + cppClassName + " {\n" +
-				"\tstruct " + cppClassName + "_VTable* vtbl;\n" +
+			ret.WriteString("class " + subclassName + " final : public " + cppClassName + " {\n" +
+				"\tconst " + vtableStructName + "* vtbl;\n" +
+				"\tvoid* vdata;\n" +
 				"public:\n" +
+				"\tfriend const " + vtableStructName + "* " + cabiVTableName(c) + "(const " + subclassName + "* self);\n" +
+				"\tfriend void* " + cabiVdataName(c) + "(const " + subclassName + "* self);\n" +
+				"\tfriend void " + cabiSetVdataName(c) + "(" + subclassName + "* self, void* vdata);\n" +
 				"\n",
 			)
 
 			for _, ctor := range c.Ctors {
 				ret.WriteString(
-					"\t" + overriddenClassName + "(" + emitParametersCpp(ctor, ifv(len(virtualMethods) > 0, "struct "+cppClassName+"_VTable", "")) + "): " +
-						cppClassName + "(" + emitParameterNames(ctor) + ")" + ifv(len(virtualMethods) > 0, ", vtbl(vtbl)", "") + " {};\n")
+					"\t" + subclassName + "(" + emitParametersCpp(ctor, vtableStructName) + "): " +
+						cppClassName + "(" + emitParameterNames(ctor) + "), vtbl(vtbl), vdata(vdata) {}\n")
 			}
 			ret.WriteString("\n")
 
 			if !c.CanDelete {
 				ret.WriteString(
 					"private:\n" +
-						"\tvirtual ~" + overriddenClassName + "();\n" + //  = delete;\n" +
+						"\tvirtual ~" + subclassName + "();\n" + //  = delete;\n" +
 						"\n" +
 						"public:\n" +
 						"\n",
 				)
 			} else {
 				ret.WriteString(
-					"\tvirtual ~" + overriddenClassName + "() override { if(vtbl->destructor) vtbl->destructor(vtbl, this); }\n" +
+					"\tvirtual ~" + subclassName + "() override { if(vtbl->destructor) vtbl->destructor(this); }\n" +
 						"\n",
 				)
 			}
@@ -1077,8 +1094,7 @@ extern "C" {
 					// original method name (CppCallTarget), not the MethodName
 
 					ret.WriteString(
-						"\t// Subclass to allow providing a Go implementation\n" +
-							"\tvirtual " + m.ReturnType.RenderTypeQtCpp() + " " + m.CppCallTarget() + "(" + emitParametersCpp(m, "") + ") " + ifv(m.IsConst, "const ", "") + ifv(m.IsNoExcept, "noexcept ", "") + "override {\n",
+						"\tvirtual " + m.ReturnType.RenderTypeQtCpp() + " " + m.CppCallTarget() + "(" + emitParametersCpp(m, "") + ") " + ifv(m.IsConst, "const ", "") + ifv(m.IsNoExcept, "noexcept ", "") + "override {\n",
 					)
 
 					ret.WriteString("\t\tif (vtbl->" + m.SafeMethodName() + " == 0) {\n")
@@ -1098,9 +1114,7 @@ extern "C" {
 					ret.WriteString("\t\t}\n")
 
 					paramArgs := []string{}
-					paramArgs = append(paramArgs, "vtbl")
 					paramArgs = append(paramArgs, "this")
-
 					var signalCode string
 
 					for i, p := range m.Parameters {
@@ -1130,7 +1144,7 @@ extern "C" {
 					// (e.g. QAbstractItemView::CursorAction)
 
 					ret.WriteString(
-						"\tfriend " + m.ReturnType.RenderTypeCabi() + " " + cabiVirtualBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ");\n\n",
+						"\tfriend " + m.ReturnType.RenderTypeCabi() + " " + cabiVirtualBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+subclassName+"*") + ");\n\n",
 					)
 
 				}
@@ -1147,7 +1161,7 @@ extern "C" {
 				// (e.g. QAbstractItemView::CursorAction)
 
 				ret.WriteString(
-					"\tfriend " + m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ");\n",
+					"\tfriend " + m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+subclassName+"*") + ");\n",
 				)
 			}
 
@@ -1155,15 +1169,17 @@ extern "C" {
 				"};\n" +
 					"\n")
 
-			cppClassName = overriddenClassName
+			cppClassName = subclassName
 		}
+
+		derivedName := ifv(len(virtualMethods) > 0, cppSubclassName(c), cabiClassName(c.ClassName))
 
 		for i, ctor := range c.Ctors {
 
 			preamble, forwarding := emitParametersCABI2CppForwarding(ctor.Parameters, "\t", len(virtualMethods) > 0)
 
 			ret.WriteString(
-				cabiClassName(c.ClassName) + "* " + cabiNewName(c, i) + "(" + emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0) + ") {\n",
+				derivedName + "* " + cabiNewName(c, i) + "(" + emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0) + ") {\n",
 			)
 
 			if ctor.LinuxOnly {
@@ -1176,7 +1192,7 @@ extern "C" {
 
 			ret.WriteString(
 				preamble +
-					"\treturn new " + cppClassName + "(" + forwarding + ");\n",
+					"\treturn new " + derivedName + "(" + forwarding + ");\n",
 			)
 
 			if ctor.LinuxOnly {
@@ -1317,7 +1333,7 @@ extern "C" {
 				}
 
 				ret.WriteString(
-					`void ` + cabiConnectName(c, m) + `(` + methodPrefixName + `* self, intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) {` + `
+					`void ` + cabiConnectName(c, m) + `(` + derivedName + `* self, intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) {` + `
 	struct local_caller : seaqt::caller {
 		constexpr local_caller(intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) : callback(callback), caller{slot, release} {}
 		void (*callback)(` + callbackParams + `);
@@ -1382,12 +1398,12 @@ extern "C" {
 
 				vbpreamble, vbforwarding := emitParametersCABI2CppForwarding(m.Parameters, "\t", false)
 
-				callTarget := "( (" + ifv(m.IsConst, "const ", "") + cppClassName + "*)(self) )->" + c.ClassName + "::" + m.CppCallTarget() + "(" + vbforwarding + ")"
+				callTarget := "self->" + c.ClassName + "::" + m.CppCallTarget() + "(" + vbforwarding + ")"
 
 				ret.WriteString(
-					m.ReturnType.RenderTypeCabi() + " " + cabiVirtualBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ") {\n" +
+					m.ReturnType.RenderTypeCabi() + " " + cabiVirtualBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+derivedName+"*") + ") {\n" +
 						vbpreamble + "\n" +
-						fixupProtectedReferences(emitAssignCppToCabi("\treturn ", m.ReturnType, callTarget)) + "\n" +
+						fixupProtectedReferences(emitAssignCppToCabi("\treturn ", m.ReturnType, callTarget)) +
 						"}\n" +
 						"\n",
 				)
@@ -1395,10 +1411,13 @@ extern "C" {
 			}
 		}
 
-		for _, p := range c.Props {
-			if p.PropertyName == "staticMetaObject" {
-				ret.WriteString(fmt.Sprintf("const QMetaObject* %s() { return &%s::staticMetaObject; }\n", cabiStaticMetaObjectName(c), c.ClassName))
+		if len(c.Props) > 0 {
+			for _, p := range c.Props {
+				if p.PropertyName == "staticMetaObject" {
+					ret.WriteString(fmt.Sprintf("const QMetaObject* %s() { return &%s::staticMetaObject; }\n", cabiStaticMetaObjectName(c), c.ClassName))
+				}
 			}
+			ret.WriteString("\n")
 		}
 
 		if len(virtualMethods) > 0 {
@@ -1406,20 +1425,22 @@ extern "C" {
 			// protected methods
 			// This is a standalone function, but it can access the protected
 			// method via a friend declaration
+			ret.WriteString(
+				"const " + cabiVtableStructName(c) + "* " + cabiVTableName(c) + "(const " + derivedName + "* self) { return self->vtbl; }\n" +
+					"void* " + cabiVdataName(c) + "(const " + derivedName + "* self) { return self->vdata; }\n" +
+					"void " + cabiSetVdataName(c) + "(" + derivedName + "* self, void* vdata) { self->vdata = vdata; }\n" +
+					"\n",
+			)
 
 			for _, m := range protectedMethods {
 
 				vbpreamble, vbforwarding := emitParametersCABI2CppForwarding(m.Parameters, "\t\t", false)
-				vbCallTarget := "self_cast->" + m.CppCallTarget() + "(" + vbforwarding + ")"
-
-				//
+				vbCallTarget := "self->" + m.CppCallTarget() + "(" + vbforwarding + ")"
 
 				ret.WriteString(
-					m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+"void*") + ") {\n" +
-
-						"\t" + cppClassName + "* self_cast = static_cast<" + cppClassName + "*>( (" + cabiClassName(c.ClassName) + "*)(self) );\n" +
-						"\t" + vbpreamble + "\n" +
-						fixupProtectedReferences(emitAssignCppToCabi("\treturn ", m.ReturnType, vbCallTarget)) + "\n" +
+					m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+derivedName+"*") + ") {\n" +
+						vbpreamble +
+						fixupProtectedReferences(emitAssignCppToCabi("\treturn ", m.ReturnType, vbCallTarget)) +
 						"}\n" +
 						"\n",
 				)
