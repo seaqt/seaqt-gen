@@ -178,12 +178,16 @@ func cabiClassNameNim(className string, cabi bool) string {
 	return className
 }
 
-func ncabiCallbackName(c CppClass, m CppMethod) string {
-	return "miqt_exec_callback_" + cabiClassNameNim(c.ClassName, true) + "_" + m.rawMethodName()
+func ncabiSlotCallbackName(c CppClass, m CppMethod) string {
+	return cabiClassNameNim(c.ClassName, true) + "_slot_callback_" + m.rawMethodName()
+}
+
+func ncabiVtableCallbackName(c CppClass, m CppMethod) string {
+	return cabiClassNameNim(c.ClassName, true) + "_vtable_callback_" + m.rawMethodName()
 }
 
 func ncabiMethodCallbackName(c CppClass, m CppMethod) string {
-	return "miqt_exec_method_" + cabiClassNameNim(c.ClassName, true) + "_" + m.rawMethodName()
+	return cabiClassNameNim(c.ClassName, true) + "_method_callback_" + m.rawMethodName()
 }
 
 func ncabiNewName(c CppClass, i int) string {
@@ -211,6 +215,18 @@ func ncabiVirtualBaseName(c CppClass, m CppMethod) string {
 }
 func ncabiProtectedBaseName(c CppClass, m CppMethod) string {
 	return "f" + cabiClassNameNim(c.ClassName, true) + `_protectedbase_` + m.SafeMethodName()
+}
+
+func ncabiVTableName(c CppClass) string {
+	return "f" + cabiClassNameNim(c.ClassName, true) + `_vtbl`
+}
+
+func ncabiVdataName(c CppClass) string {
+	return "f" + cabiClassNameNim(c.ClassName, true) + `_vdata`
+}
+
+func ncabiSetVdataName(c CppClass) string {
+	return "f" + cabiClassNameNim(c.ClassName, true) + `_setVdata`
 }
 
 func isQObject(s string) bool {
@@ -454,10 +470,14 @@ func (p CppParameter) parameterTypeNim(gfs *nimFileState) string {
 	return p.renderTypeNim(gfs, true)
 }
 
-func (gfs *nimFileState) emitParametersNim(params []CppParameter, cabi bool) string {
+func (gfs *nimFileState) emitParametersNim(params []CppParameter, cabi bool, self string) string {
 	tmp := make([]string, 0, len(params))
 
 	skipNext := false
+
+	if len(self) > 0 {
+		tmp = append(tmp, self)
+	}
 
 	for i, p := range params {
 		if IsArgcArgv(params, i) {
@@ -479,11 +499,15 @@ func (gfs *nimFileState) emitParametersNim(params []CppParameter, cabi bool) str
 	return strings.Join(tmp, ", ")
 }
 
-func (gfs *nimFileState) emitParametersNim2CABIForwarding(m CppMethod) (preamble string, forwarding string) {
+func (gfs *nimFileState) emitParametersNim2CABIForwarding(m CppMethod, extra string) (preamble string, forwarding string) {
 	tmp := make([]string, 0, len(m.Parameters)+2)
 
 	if !m.IsStatic {
 		tmp = append(tmp, "self.h")
+	}
+
+	if len(extra) > 0 {
+		tmp = append(tmp, extra)
 	}
 
 	skipNext := false
@@ -1143,7 +1167,7 @@ export ` + gfs.currentUnitName + `_types
 				continue // already in ..._types
 			}
 
-			preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m)
+			preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m, "")
 
 			returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
 			rawReturnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, true)
@@ -1151,10 +1175,10 @@ export ` + gfs.currentUnitName + `_types
 			nimMethodName := uniqueName(&gfs, sigs, m)
 			rvalue := rawMethodName + `(` + forwarding + `)`
 
-			params := ifv(m.IsStatic, `_: type `, `self: `) + nimPkgClassName + ", " + gfs.emitParametersNim(m.Parameters, false)
+			params := gfs.emitParametersNim(m.Parameters, false, ifv(m.IsStatic, `_: type `, `self: `)+nimPkgClassName)
 
 			// TOOD `this: ptr ` + rawClassName + `, `?
-			rawParams := ifv(m.IsStatic, "", "self: pointer, ") + gfs.emitParametersNim(m.Parameters, true)
+			rawParams := gfs.emitParametersNim(m.Parameters, true, ifv(m.IsStatic, "", "self: pointer"))
 
 			fmt.Fprintf(&cabi, `proc %[1]s(%[2]s): %[3]s {.importc: "%[4]s".}
 `, rawMethodName, rawParams, rawReturnTypeDecl, cabiMethodName(c, m))
@@ -1178,7 +1202,7 @@ export ` + gfs.currentUnitName + `_types
 				}
 
 				cbTypeName := nimClassName + m.rawMethodName() + "Slot"
-				cbType := `proc(` + gfs.emitParametersNim(m.Parameters, false) + `)`
+				cbType := `proc(` + gfs.emitParametersNim(m.Parameters, false, "") + `)`
 
 				fmt.Fprintf(&cabi, `proc %[1]s(self: pointer, slot: int, callback: proc (%[3]s) {.cdecl.}, release: proc(slot: int) {.cdecl.}) {.importc: "%[2]s".}
 `, ncabiConnectName(c, m), cabiConnectName(c, m), strings.Join(namedParams, ", "))
@@ -1198,7 +1222,7 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
   GC_ref(tmp)
   %[7]s(self.h, cast[int](addr tmp[]), %[3]s, %[3]s_release)
 
-`, cbTypeName, cbType, ncabiCallbackName(c, m), strings.Join(namedParams, ", "),
+`, cbTypeName, cbType, ncabiSlotCallbackName(c, m), strings.Join(namedParams, ", "),
 					conversion, strings.Join(paramNames, `, `), ncabiConnectName(c, m),
 					m.nimMethodName(), nimPkgClassName)
 			}
@@ -1207,19 +1231,21 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 		if len(virtualMethods) > 0 {
 			for _, m := range virtualMethods {
 				cbTypeName := nimClassName + m.rawMethodName() + "Proc"
-				fmt.Fprintf(&ret, "type %s* = proc(self: %s%s): %s {.raises: [], gcsafe.}\n", cbTypeName, nimClassName+ifv(len(m.Parameters) > 0, ", ", ""), gfs.emitParametersNim(m.Parameters, false), m.ReturnType.renderReturnTypeNim(&gfs, false))
+				fmt.Fprintf(&ret, "type %s* = proc(%s): %s {.raises: [], gcsafe.}\n", cbTypeName, gfs.emitParametersNim(m.Parameters, false, "self: "+nimClassName), m.ReturnType.renderReturnTypeNim(&gfs, false))
 			}
 
-			fmt.Fprintf(&cabi, `type %[1]sVTable {.pure.} = object
-  destructor*: proc(vtbl: ptr %[1]sVTable, self: ptr %[1]s) {.cdecl, raises:[], gcsafe.}
-`, rawClassName)
+			fmt.Fprintf(&cabi, `proc %[2]s(self: pointer): pointer {.importc: "%[3]s".}
+proc %[4]s(self: pointer): pointer {.importc: "%[5]s".}
+type %[1]sVTable {.pure.} = object
+  destructor*: proc(self: pointer) {.cdecl, raises:[], gcsafe.}
+`, rawClassName, ncabiVTableName(c), cabiVTableName(c), ncabiVdataName(c), cabiVdataName(c))
 
 			fmt.Fprintf(&ret, `type %[1]sVTable* {.inheritable, pure.} = object
   vtbl: %[2]sVTable
 `, nimClassName, rawClassName)
 
 			for _, m := range virtualMethods {
-				fmt.Fprintf(&cabi, "  %s*: proc(vtbl, self: pointer, %s): %s {.cdecl, raises: [], gcsafe.}\n", m.rawMethodName(), gfs.emitParametersNim(m.Parameters, true), m.ReturnType.renderReturnTypeNim(&gfs, true))
+				fmt.Fprintf(&cabi, "  %s*: proc(%s): %s {.cdecl, raises: [], gcsafe.}\n", m.rawMethodName(), gfs.emitParametersNim(m.Parameters, true, "self: pointer"), m.ReturnType.renderReturnTypeNim(&gfs, true))
 
 				cbTypeName := nimClassName + m.rawMethodName() + "Proc"
 				fmt.Fprintf(&ret, "  %s*: %s\n", m.rawMethodName(), cbTypeName)
@@ -1231,20 +1257,20 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 				// This is only possible if the function is not pure-virtual
 
 				if !m.IsPureVirtual {
-					preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m)
+					preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m, "")
 
 					forwarding = "self.h" + strings.TrimPrefix(forwarding, `self.h`) // TODO integrate properly
 
 					returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
 					rawReturnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, true)
 
-					fmt.Fprintf(&cabi, `proc %[1]s(self: pointer, %[3]s): %[4]s {.importc: "%[2]s".}
-`, ncabiVirtualBaseName(c, m), cabiVirtualBaseName(c, m), gfs.emitParametersNim(m.Parameters, true), rawReturnTypeDecl)
+					fmt.Fprintf(&cabi, `proc %[1]s(%[3]s): %[4]s {.importc: "%[2]s".}
+`, ncabiVirtualBaseName(c, m), cabiVirtualBaseName(c, m), gfs.emitParametersNim(m.Parameters, true, "self: pointer"), rawReturnTypeDecl)
 
-					fmt.Fprintf(&ret, `proc %[1]s%[2]s*(self: %[3]s, %[4]s): %[5]s =
+					fmt.Fprintf(&ret, `proc %[1]s%[2]s*(%[4]s): %[5]s =
 %[6]s%[7]s
 `,
-						nimClassName, m.nimMethodName(), nimPkgClassName, gfs.emitParametersNim(m.Parameters, false), returnTypeDecl,
+						nimClassName, m.nimMethodName(), nimPkgClassName, gfs.emitParametersNim(m.Parameters, false, "self: "+nimPkgClassName), returnTypeDecl,
 						preamble,
 						gfs.emitCabiToNim("", m.ReturnType, ncabiVirtualBaseName(c, m)+`(`+forwarding+`)`),
 					)
@@ -1258,7 +1284,6 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 					var namedParams []string
 					var paramNames []string
 
-					namedParams = append(namedParams, "vtbl: pointer")
 					namedParams = append(namedParams, "self: pointer")
 
 					paramNames = append(paramNames, "self")
@@ -1272,8 +1297,8 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 
 					cabiReturnType := m.ReturnType.parameterTypeNim(&gfs)
 
-					ret.WriteString(`proc ` + ncabiCallbackName(c, m) + `(` + strings.Join(namedParams, `, `) + `): ` + cabiReturnType + ` {.cdecl.} =
-  let vtbl = cast[ptr ` + nimClassName + `VTable](vtbl)
+					ret.WriteString(`proc ` + ncabiVtableCallbackName(c, m) + `(` + strings.Join(namedParams, `, `) + `): ` + cabiReturnType + ` {.cdecl.} =
+  let vtbl = cast[ptr ` + nimClassName + `VTable](` + ncabiVdataName(c) + `(self))
   let self = ` + nimClassName + `(h: self)
 `)
 					ret.WriteString(conversion)
@@ -1297,9 +1322,9 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 			for _, m := range virtualMethods {
 				returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
 
-				fmt.Fprintf(&ret, `method %[2]s*(self: Virtual%[1]s, %[4]s): %[5]s {.base.} =
+				fmt.Fprintf(&ret, `method %[2]s*(%[4]s): %[5]s {.base.} =
 `,
-					nimClassName, m.nimMethodName(), nimPkgClassName, gfs.emitParametersNim(m.Parameters, false), returnTypeDecl,
+					nimClassName, m.nimMethodName(), nimPkgClassName, gfs.emitParametersNim(m.Parameters, false, "self: Virtual"+nimClassName), returnTypeDecl,
 				)
 				if !m.IsPureVirtual {
 					var paramNames []string
@@ -1324,8 +1349,7 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 					var namedParams []string
 					var paramNames []string
 
-					namedParams = append(namedParams, "vtbl: pointer")
-					namedParams = append(namedParams, "inst: pointer")
+					namedParams = append(namedParams, "self: pointer")
 
 					for i, pp := range m.Parameters {
 						namedParams = append(namedParams, pp.nimParameterName()+": "+pp.parameterTypeNim(&gfs))
@@ -1337,13 +1361,13 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 					cabiReturnType := m.ReturnType.parameterTypeNim(&gfs)
 
 					ret.WriteString(`proc ` + ncabiMethodCallbackName(c, m) + `(` + strings.Join(namedParams, `, `) + `): ` + cabiReturnType + ` {.cdecl.} =
-  let vtbl = cast[Virtual` + nimClassName + `](cast[uint](vtbl) - uint(offsetOf(Virtual` + nimClassName + `, vtbl)))
+  let inst = cast[Virtual` + nimClassName + `](` + ncabiVdataName(c) + `(self))
 `)
 					ret.WriteString(conversion)
 					if cabiReturnType == "void" {
-						ret.WriteString(gfs.ind + `vtbl.` + m.nimMethodName() + `(` + strings.Join(paramNames, `, `) + ")\n\n")
+						ret.WriteString(gfs.ind + `inst.` + m.nimMethodName() + `(` + strings.Join(paramNames, `, `) + ")\n\n")
 					} else {
-						ret.WriteString(gfs.ind + `var virtualReturn = vtbl.` + m.nimMethodName() + `(` + strings.Join(paramNames, `, `) + ")\n")
+						ret.WriteString(gfs.ind + `var virtualReturn = inst.` + m.nimMethodName() + `(` + strings.Join(paramNames, `, `) + ")\n")
 						virtualRetP := m.ReturnType // copy
 						virtualRetP.ParameterName = "virtualReturn"
 						binding, rvalue := gfs.emitParameterNim2CABIForwarding(virtualRetP, true)
@@ -1360,83 +1384,34 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 			// This is only possible if the function is not pure-virtual
 
 			if !m.IsPureVirtual {
-				preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m)
+				preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m, "")
 
 				forwarding = "self.h" + strings.TrimPrefix(forwarding, `self.h`) // TODO integrate properly
 
 				returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
 				rawReturnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, true)
 
-				fmt.Fprintf(&cabi, `proc %[1]s(self: pointer, %[3]s): %[4]s {.importc: "%[2]s".}
-`, ncabiProtectedBaseName(c, m), cabiProtectedBaseName(c, m), gfs.emitParametersNim(m.Parameters, true), rawReturnTypeDecl)
+				fmt.Fprintf(&cabi, `proc %[1]s(%[3]s): %[4]s {.importc: "%[2]s".}
+`, ncabiProtectedBaseName(c, m), cabiProtectedBaseName(c, m), gfs.emitParametersNim(m.Parameters, true, "self: pointer"), rawReturnTypeDecl)
 
-				fmt.Fprintf(&ret, `proc %[2]s*(self: %[3]s, %[4]s): %[5]s =
+				fmt.Fprintf(&ret, `proc %[2]s*(%[4]s): %[5]s =
 %[6]s%[7]s
 `,
-					nimClassName, m.nimMethodName(), nimPkgClassName, gfs.emitParametersNim(m.Parameters, false), returnTypeDecl,
+					nimClassName, m.nimMethodName(), nimPkgClassName, gfs.emitParametersNim(m.Parameters, false, "self: "+nimPkgClassName), returnTypeDecl,
 					preamble,
 					gfs.emitCabiToNim("", m.ReturnType, ncabiProtectedBaseName(c, m)+`(`+forwarding+`)`),
 				)
 			}
 		}
 
-		for i, ctor := range c.Ctors {
-			preamble, forwarding := gfs.emitParametersNim2CABIForwarding(ctor)
-			cabiParams := ifv(len(virtualMethods) > 0, "vtbl: pointer, ", "") + gfs.emitParametersNim(ctor.Parameters, true)
-			fmt.Fprintf(&cabi, `proc %[1]s(%[2]s): ptr %[3]s {.importc: "%[4]s".}
+		if len(c.Ctors) > 0 {
+			for i, ctor := range c.Ctors {
+				preamble, forwarding := gfs.emitParametersNim2CABIForwarding(ctor, ifv(len(virtualMethods) > 0, "addr(vtbl[].vtbl), addr(vtbl[])", ""))
+				cabiParams := gfs.emitParametersNim(ctor.Parameters, true, ifv(len(virtualMethods) > 0, "vtbl, vdata: pointer", ""))
+				fmt.Fprintf(&cabi, `proc %[1]s(%[2]s): ptr %[3]s {.importc: "%[4]s".}
 `, ncabiNewName(c, i), cabiParams, rawClassName, cabiNewName(c, i))
 
-			nimParams := gfs.emitParametersNim(ctor.Parameters, false)
-			paramsX := ""
-			for _, p := range ctor.Parameters {
-				paramsX = paramsX + "," + p.renderTypeNim(&gfs, false)
-			}
-			orig := paramsX
-			j := 0
-			for {
-				if _, ok := sigs[paramsX]; ok {
-					j += 1
-					paramsX = maybeSuffix(j) + orig
-				} else {
-					sigs[paramsX] = struct{}{}
-					break
-				}
-			}
-
-			vparams := []string{}
-			vparams = append(vparams, "T: type "+nimPkgClassName)
-			if len(nimParams) > 0 {
-				vparams = append(vparams, nimParams)
-			}
-			if len(virtualMethods) > 0 {
-				preamble = preamble + `  let vtbl = if vtbl == nil: new ` + nimClassName + `VTable else: vtbl
-  GC_ref(vtbl)
-  vtbl[].vtbl.destructor = proc(vtbl: ptr ` + rawClassName + `VTable, _: ptr ` + rawClassName + `) {.cdecl.} =
-    let vtbl = cast[ref ` + nimClassName + `VTable](vtbl)
-    GC_unref(vtbl)
-`
-				forwarding = "addr(vtbl[].vtbl), " + forwarding
-				vparams = append(vparams, "vtbl: ref "+nimClassName+"VTable = nil")
-				for _, m := range virtualMethods {
-					preamble = preamble + fmt.Sprintf(`  if not isNil(vtbl[].%[1]s):
-    vtbl[].vtbl.%[1]s = %[2]s
-`, m.rawMethodName(), ncabiCallbackName(c, m))
-				}
-			}
-
-			fmt.Fprintf(&ret, `proc create%[1]s*(%[3]s): %[2]s =
-%[4]s  %[2]s(h: %[5]s(%[6]s), owned: true)
-
-`, maybeSuffix(j), nimPkgClassName, strings.Join(vparams, ",\n    "),
-				preamble, ncabiNewName(c, i), forwarding)
-		}
-
-		if len(virtualMethods) > 0 {
-			sigs = map[string]struct{}{}
-			for i, ctor := range c.Ctors {
-				preamble, forwarding := gfs.emitParametersNim2CABIForwarding(ctor)
-
-				nimParams := gfs.emitParametersNim(ctor.Parameters, false)
+				nimParams := gfs.emitParametersNim(ctor.Parameters, false, "")
 				paramsX := ""
 				for _, p := range ctor.Parameters {
 					paramsX = paramsX + "," + p.renderTypeNim(&gfs, false)
@@ -1459,25 +1434,75 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 					vparams = append(vparams, nimParams)
 				}
 				if len(virtualMethods) > 0 {
-					preamble = preamble + `
-  vtbl[].vtbl.destructor = proc(vtbl: ptr ` + rawClassName + `VTable, _: ptr ` + rawClassName + `) {.cdecl.} =
-    let vtbl = cast[ptr typeof(Virtual` + nimClassName + `()[])](cast[uint](vtbl) - uint(offsetOf(Virtual` + nimClassName + `, vtbl)))
-    vtbl[].h = nil
-    vtbl[].owned = false
+					preamble = preamble + `  let vtbl = if vtbl == nil: new ` + nimClassName + `VTable else: vtbl
+  GC_ref(vtbl)
+  vtbl[].vtbl.destructor = proc(self: pointer) {.cdecl.} =
+    let vtbl = cast[ref ` + nimClassName + `VTable](` + ncabiVdataName(c) + `(self))
+    GC_unref(vtbl)
 `
-					forwarding = "addr(vtbl[].vtbl), " + forwarding
-					vparams = append(vparams, "vtbl: Virtual"+nimClassName)
+					vparams = append(vparams, "vtbl: ref "+nimClassName+"VTable = nil")
 					for _, m := range virtualMethods {
-						preamble = preamble + fmt.Sprintf(`  vtbl[].vtbl.%[1]s = %[2]s
-`, m.nimMethodName(), ncabiMethodCallbackName(c, m))
+						preamble = preamble + fmt.Sprintf(`  if not isNil(vtbl[].%[1]s):
+    vtbl[].vtbl.%[1]s = %[2]s
+`, m.rawMethodName(), ncabiVtableCallbackName(c, m))
 					}
 				}
 
+				fmt.Fprintf(&ret, `proc create%[1]s*(%[3]s): %[2]s =
+%[4]s  %[2]s(h: %[5]s(%[6]s), owned: true)
+
+`, maybeSuffix(j), nimPkgClassName, strings.Join(vparams, ",\n    "),
+					preamble, ncabiNewName(c, i), forwarding)
+			}
+		}
+
+		if len(virtualMethods) > 0 {
+
+			fmt.Fprintf(&ret, `const %[1]s_mvtbl = %[1]sVTable(
+  destructor: proc(self: pointer) {.cdecl.} =
+    let inst = cast[ptr typeof(Virtual%[2]s()[])](self.%[3]s())
+    inst[].h = nil
+    inst[].owned = false,
+`, rawClassName, nimClassName, ncabiVTableName(c))
+			for _, m := range virtualMethods {
+				fmt.Fprintf(&ret, `  %[1]s: %[2]s,
+`, m.rawMethodName(), ncabiMethodCallbackName(c, m))
+			}
+			ret.WriteString(")\n")
+
+			sigs = map[string]struct{}{}
+			for i, ctor := range c.Ctors {
+				preamble, forwarding := gfs.emitParametersNim2CABIForwarding(ctor, "addr("+rawClassName+"_mvtbl), addr(inst[])")
+
+				nimParams := gfs.emitParametersNim(ctor.Parameters, false, "")
+				paramsX := ""
+				for _, p := range ctor.Parameters {
+					paramsX = paramsX + "," + p.renderTypeNim(&gfs, false)
+				}
+				orig := paramsX
+				j := 0
+				for {
+					if _, ok := sigs[paramsX]; ok {
+						j += 1
+						paramsX = maybeSuffix(j) + orig
+					} else {
+						sigs[paramsX] = struct{}{}
+						break
+					}
+				}
+
+				vparams := []string{}
+				vparams = append(vparams, "T: type "+nimPkgClassName)
+				if len(nimParams) > 0 {
+					vparams = append(vparams, nimParams)
+				}
+				vparams = append(vparams, "inst: Virtual"+nimClassName)
+
 				// TODO https://github.com/nim-lang/Nim/issues/24725
 				fmt.Fprintf(&ret, `proc create%[1]s*(%[3]s) =
-%[4]s  if vtbl[].h != nil: delete(move(vtbl[]))
-  vtbl[].h = %[5]s(%[6]s)
-  vtbl[].owned = true
+%[4]s  if inst[].h != nil: delete(move(inst[]))
+  inst[].h = %[5]s(%[6]s)
+  inst[].owned = true
 
 `, maybeSuffix(j), nimPkgClassName, strings.Join(vparams, ",\n    "),
 					preamble, ncabiNewName(c, i), forwarding)
