@@ -88,10 +88,8 @@ func cabiSetVdataName(c CppClass) string {
 
 func (p CppParameter) RenderTypeCabi() string {
 
-	if p.ParameterType == "QString" {
-		return "struct miqt_string"
-
-	} else if p.ParameterType == "QByteArray" {
+	if p.ParameterType == "QString" || p.ParameterType == "QAnyStringView" ||
+		p.ParameterType == "QByteArray" || p.ParameterType == "QByteArrayView" {
 		return "struct miqt_string"
 
 	} else if inner, ok := p.QListOf(); ok {
@@ -292,9 +290,22 @@ func emitCABI2CppForwarding(p CppParameter, indent string, delete bool) (preambl
 	if p.ParameterType == "QString" {
 		// The CABI received parameter is a struct miqt_string, passed by value
 		// C++ needs it as a QString. Create one on the stack for automatic cleanup
+		// The view types ideally wouldn't need conver
 		preamble += indent + "QString " + nameprefix + "_QString = QString::fromUtf8(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
 		if delete {
 			preamble += indent + "free(" + p.cParameterName() + ".data);\n"
+		}
+		return preamble, nameprefix + "_QString"
+	} else if p.ParameterType == "QAnyStringView" {
+		// The CABI received parameter is a struct miqt_string, passed by value
+		// C++ needs it as a QString. Create one on the stack for automatic cleanup
+		// The view types ideally wouldn't need conver
+		if delete {
+			// Take a C++-managed copy
+			preamble += indent + "QString " + nameprefix + "_QString = QString::fromUtf8(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
+			preamble += indent + "free(" + p.cParameterName() + ".data);\n"
+		} else {
+			preamble += indent + "QAnyStringView " + nameprefix + "_QString = QAnyStringView(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
 		}
 		return preamble, nameprefix + "_QString"
 
@@ -303,6 +314,17 @@ func emitCABI2CppForwarding(p CppParameter, indent string, delete bool) (preambl
 		preamble += indent + "QByteArray " + nameprefix + "_QByteArray(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
 		if delete {
 			preamble += indent + "free(" + p.cParameterName() + ".data);\n"
+		}
+		return preamble, nameprefix + "_QByteArray"
+
+	} else if p.ParameterType == "QByteArrayView" {
+		// This ctor makes a deep copy, on the stack which will be dtor'd by RAII
+		if delete {
+			// Take a C++-managed copy
+			preamble += indent + "QByteArray " + nameprefix + "_QByteArray(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
+			preamble += indent + "free(" + p.cParameterName() + ".data);\n"
+		} else {
+			preamble += indent + "QByteArrayView " + nameprefix + "_QByteArray(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
 		}
 		return preamble, nameprefix + "_QByteArray"
 
@@ -475,19 +497,24 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		shouldReturn = ""
 		return indent + shouldReturn + rvalue + ";\n" + afterCall
 
-	} else if p.ParameterType == "QString" {
+	} else if p.ParameterType == "QString" || p.ParameterType == "QAnyStringView" {
 
 		if p.Pointer {
 			// e.g. QTextStream::String()
 			// These are rare, and probably expected to be lightweight references
 			// But, a copy is the best we can project it as
 			// Un-pointer-ify
-			shouldReturn = ifv(p.Const, "const ", "") + "QString* " + namePrefix + "_ret = "
+			shouldReturn = ifv(p.Const, "const ", "") + "QString* " + namePrefix + "_ret = " + rvalue
 			afterCall = indent + "// Convert QString pointer from UTF-16 in C++ RAII memory to UTF-8 in manually-managed C memory\n"
 			afterCall += indent + "QByteArray " + namePrefix + "_b = " + namePrefix + "_ret->toUtf8();\n"
 
 		} else {
-			shouldReturn = ifv(p.Const, "const ", "") + "QString " + namePrefix + "_ret = "
+			if p.ParameterType == "QAnyStringView" {
+				// soo many copies ...
+				shouldReturn = ifv(p.Const, "const ", "") + "QString " + namePrefix + "_ret = (" + rvalue + ").toString()"
+			} else {
+				shouldReturn = ifv(p.Const, "const ", "") + "QString " + namePrefix + "_ret = " + rvalue
+			}
 			afterCall = indent + "// Convert QString from UTF-16 in C++ RAII memory to UTF-8 in manually-managed C memory\n"
 			afterCall += indent + "QByteArray " + namePrefix + "_b = " + namePrefix + "_ret.toUtf8();\n"
 		}
@@ -497,13 +524,26 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		afterCall += indent + namePrefix + "_ms.data = static_cast<char*>(malloc(" + namePrefix + "_ms.len));\n"
 		afterCall += indent + "memcpy(" + namePrefix + "_ms.data, " + namePrefix + "_b.data(), " + namePrefix + "_ms.len);\n"
 		afterCall += indent + assignExpression + namePrefix + "_ms;\n"
-		return indent + shouldReturn + rvalue + ";\n" + afterCall
+		return indent + shouldReturn + ";\n" + afterCall
 
 	} else if p.ParameterType == "QByteArray" {
 		// C++ has given us a QByteArray. CABI needs this as a struct miqt_string
 		// Do not free the data, the caller will free it
 
 		shouldReturn = ifv(p.Const, "const ", "") + "QByteArray " + namePrefix + "_qb = "
+
+		afterCall += indent + "struct miqt_string " + namePrefix + "_ms;\n"
+		afterCall += indent + namePrefix + "_ms.len = " + namePrefix + "_qb.length();\n"
+		afterCall += indent + namePrefix + "_ms.data = static_cast<char*>(malloc(" + namePrefix + "_ms.len));\n"
+		afterCall += indent + "memcpy(" + namePrefix + "_ms.data, " + namePrefix + "_qb.data(), " + namePrefix + "_ms.len);\n"
+		afterCall += indent + assignExpression + namePrefix + "_ms;\n"
+		return indent + shouldReturn + rvalue + ";\n" + afterCall
+
+	} else if p.ParameterType == "QByteArrayView" {
+		// C++ has given us a QByteArrayView. CABI needs this as a struct miqt_string
+		// Do not free the data, the caller will free it
+
+		shouldReturn = ifv(p.Const, "const ", "") + "QByteArrayView " + namePrefix + "_qb = "
 
 		afterCall += indent + "struct miqt_string " + namePrefix + "_ms;\n"
 		afterCall += indent + namePrefix + "_ms.len = " + namePrefix + "_qb.length();\n"
@@ -683,7 +723,8 @@ func getCabiZeroValue(p CppParameter) string {
 	} else if p.ParameterType == "void" {
 		return getCppZeroValue(p)
 
-	} else if p.ParameterType == "QString" || p.ParameterType == "QByteArray" {
+	} else if p.ParameterType == "QString" || p.ParameterType == "QStringView" ||
+		p.ParameterType == "QByteArray" || p.ParameterType == "QByteArrayView" {
 		return "(struct miqt_string){}"
 
 	} else if _, ok := p.QListOf(); ok {
@@ -805,7 +846,7 @@ func cabiClassName(className string) string {
 
 func cabiPreventStructDeclaration(className string) bool {
 	switch className {
-	case "QList", "QString", "QSet", "QMap", "QHash", "QPair", "QVector", "QByteArray":
+	case "QList", "QString", "QSet", "QMap", "QHash", "QPair", "QVector", "QByteArray", "QByteArrayView":
 		return true // These types are reprojected
 	default:
 		return false
@@ -1001,7 +1042,11 @@ func emitBindingCpp(src *CppParsedHeader, filename string) (string, error) {
 
 	for _, ref := range getReferencedTypes(src) {
 
-		if ref == "QString" {
+		if ref == "QAnyStringView" {
+			ret.WriteString("#include <QAnyStringView>\n")
+			ret.WriteString("#include <QString>\n")
+			ret.WriteString("#include <QByteArray>\n")
+		} else if ref == "QString" {
 			ret.WriteString("#include <QString>\n")
 			ret.WriteString("#include <QByteArray>\n")
 			ret.WriteString("#include <cstring>\n")

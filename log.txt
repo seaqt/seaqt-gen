@@ -13539,7 +13539,7 @@ Blocking method "handle"([]): Type declaration is too complex to parse
 Blocking method "javaScriptPrompt"([Param(QWebFrame* originatingFrame) Param(const QString& msg) Param(const QString& defaultValue) Param(QString* result)]): Type declaration is too complex to parse
 Processing "/usr/include/x86_64-linux-gnu/qt5/QtWebKitWidgets/qwebview.h"...
 Processing 6 file(s) completed
-Found 204 header files to process.
+Found 202 header files to process.
 Clang worker: starting
 Clang worker: starting
 -> Processing class "QAnimationGroup"...
@@ -13691,76 +13691,6 @@ Got ConstantExpr OK
 -> Skipping (There's no content to include)
 -> Processing class "QAnimationGroup"...
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
--> Processing class "tst_QAnyStringView"...
--> Skipping (There's no content to include)
--> Processing class "QAnyStringView"...
-==> NOT IMPLEMENTED "TypeAliasTemplateDecl"
-==> NOT IMPLEMENTED "TypeAliasTemplateDecl"
-==> NOT IMPLEMENTED "TypeAliasTemplateDecl"
-==> NOT IMPLEMENTED "StaticAssertDecl"
-==> NOT IMPLEMENTED "StaticAssertDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"VisibilityAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"VisibilityAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED VarDecl "VarDecl" detects_US_ASCII_at_compile_time
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED "StaticAssertDecl"
-==> NOT IMPLEMENTED "StaticAssertDecl"
-==> NOT IMPLEMENTED VarDecl "VarDecl" SizeMask
-==> NOT IMPLEMENTED VarDecl "VarDecl" Latin1Flag
-==> NOT IMPLEMENTED VarDecl "VarDecl" TwoByteCodePointFlag
-==> NOT IMPLEMENTED VarDecl "VarDecl" TypeMask
-==> NOT IMPLEMENTED "StaticAssertDecl"
-==> NOT IMPLEMENTED "FieldDecl"
-==> NOT IMPLEMENTED "IndirectFieldDecl"
-==> NOT IMPLEMENTED "IndirectFieldDecl"
-==> NOT IMPLEMENTED "IndirectFieldDecl"
-==> NOT IMPLEMENTED "FieldDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-Skipping ctor with complex type
 -> Processing class "QArrayData"...
 -> Processing class "QArrayData::QArrayData"...
 -> Skipping inner class because: There's no content to include
@@ -13906,136 +13836,6 @@ Skipping method "operator~" with complex type
 -> Processing class "QStaticByteArrayMatcherBase"...
 ==> NOT IMPLEMENTED "FieldDecl"
 ==> NOT IMPLEMENTED CXXMethodDecl->"VisibilityAttr"
--> Processing class "QByteArrayView"...
-==> NOT IMPLEMENTED "TypeAliasTemplateDecl"
-==> NOT IMPLEMENTED "TypeAliasTemplateDecl"
-==> NOT IMPLEMENTED "TypeAliasTemplateDecl"
-==> NOT IMPLEMENTED "TypeAliasTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED "FunctionTemplateDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-==> NOT IMPLEMENTED CXXMethodDecl->"WarnUnusedResultAttr"
-==> NOT IMPLEMENTED "FieldDecl"
-==> NOT IMPLEMENTED "FieldDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CXXCtorInitializer"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-Skipping ctor with complex type
 -> Processing class "QCalendarBackend"...
 -> Skipping (There's no content to include)
 -> Processing class "QDate"...
@@ -19030,10 +18830,6 @@ Blocking method "sourceModelChanged"([Param(QAbstractProxyModel::QPrivateSignal 
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qalgorithms.h"...
 Nothing in this header was bindable.
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qanimationgroup.h"...
-Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qanystringview.h"...
-Blocking constructor ""([Param(std::nullptr_t param1)]): Type declaration is too complex to parse
-Blocking constructor ""([Param(QLatin1StringView str)]): Type declaration is too complex to parse
-Blocking constructor ""([Param(QStringView v)]): Type declaration is too complex to parse
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qapplicationstatic.h"...
 Nothing in this header was bindable.
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qarraydata.h"...
@@ -19065,12 +18861,6 @@ Nothing in this header was bindable.
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qbytearraylist.h"...
 Nothing in this header was bindable.
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qbytearraymatcher.h"...
-Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qbytearrayview.h"...
-Blocking constructor ""([Param(std::nullptr_t param1)]): Type declaration is too complex to parse
-Blocking method "rbegin"([]): Type declaration is too complex to parse
-Blocking method "rend"([]): Type declaration is too complex to parse
-Blocking method "crbegin"([]): Type declaration is too complex to parse
-Blocking method "crend"([]): Type declaration is too complex to parse
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qcache.h"...
 Nothing in this header was bindable.
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qcalendar.h"...
@@ -19788,7 +19578,7 @@ Blocking constructor ""([Param(QString* string)]): Type declaration is too compl
 Blocking method "writeAttributes"([Param(const QXmlStreamAttributes& attributes)]): Type declaration is too complex to parse
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtCore/qxpfunctional.h"...
 Nothing in this header was bindable.
-Processing 204 file(s) completed
+Processing 202 file(s) completed
 Found 105 header files to process.
 Clang worker: starting
 Clang worker: starting
