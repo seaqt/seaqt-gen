@@ -86,8 +86,10 @@ func AllowHeader(fullpath string) bool {
 		"qt_windows.h",                 // Clang error
 		"qmaccocoaviewcontainer_mac.h", // Needs NSView* headers. TODO allow with darwin build tag
 		"qmacnativewidget_mac.h",       // Needs NSView* headers. TODO allow with darwin build tag
+		"qanystringview.h",             // QAnyStringView does not exist in this binding
 		"qstring.h",                    // QString does not exist in this binding
 		"qbytearray.h",                 // QByteArray does not exist in this binding
+		"qbytearrayview.h",             // QByteArrayView does not exist in this binding
 		"qlist.h",                      // QList does not exist in this binding
 		"qvector.h",                    // QVector does not exist in this binding
 		"qhash.h",                      // QHash does not exist in this binding
