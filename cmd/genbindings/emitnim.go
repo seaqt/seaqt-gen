@@ -126,7 +126,7 @@ func (nm CppMethod) nimMethodName() string {
 func uniqueName(gfs *nimFileState, sigs map[string]struct{}, m CppMethod) string {
 	paramsX := m.nimMethodName()
 	for _, p := range m.Parameters {
-		paramsX = paramsX + "," + p.renderTypeNim(gfs, false)
+		paramsX = paramsX + "," + p.renderTypeNim(gfs, false, false)
 	}
 	orig := paramsX
 	j := 0
@@ -243,7 +243,7 @@ func (gfs *nimFileState) dedent() {
 	gfs.ind = gfs.ind[:len(gfs.ind)-2]
 }
 
-func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi bool) string {
+func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi, isparam bool) string {
 	if p.Pointer && p.ParameterType == "char" {
 		if cabi {
 			return "cstring"
@@ -251,18 +251,26 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi bool) string {
 			return "cstring"
 		}
 	}
-	if p.ParameterType == "QString" {
+	if p.ParameterType == "QString" || p.ParameterType == "QAnyStringView" {
 		if cabi {
 			return "struct_miqt_string"
 		} else {
-			return "string"
+			if isparam {
+				return "openArray[char]"
+			} else {
+				return "string"
+			}
 		}
 	}
-	if p.ParameterType == "QByteArray" {
+	if p.ParameterType == "QByteArray" || p.ParameterType == "QByteArrayView" {
 		if cabi {
 			return "struct_miqt_string"
 		} else {
-			return "seq[byte]"
+			if isparam {
+				return "openArray[byte]"
+			} else {
+				return "seq[byte]"
+			}
 		}
 	}
 
@@ -270,13 +278,16 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi bool) string {
 		if cabi {
 			return "struct_miqt_array"
 		} else {
-			return "seq[" + t.renderTypeNim(gfs, cabi) + "]"
+			if isparam {
+				return "openArray[" + t.renderTypeNim(gfs, cabi, false) + "]"
+			}
+			return "seq[" + t.renderTypeNim(gfs, cabi, false) + "]"
 		}
 	}
 
 	if t, ok := p.QSetOf(); ok {
 		gfs.stdImports["std/sets"] = struct{}{}
-		return "HashSet[" + t.renderTypeNim(gfs, cabi) + "]"
+		return "HashSet[" + t.renderTypeNim(gfs, cabi, false) + "]"
 	}
 
 	if t1, t2, ok := p.QMapOf(); ok {
@@ -284,7 +295,7 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi bool) string {
 			return "struct_miqt_map"
 		} else {
 			gfs.stdImports["std/tables"] = struct{}{}
-			return "Table[" + t1.renderTypeNim(gfs, cabi) + "," + t2.renderTypeNim(gfs, cabi) + "]"
+			return "Table[" + t1.renderTypeNim(gfs, cabi, false) + "," + t2.renderTypeNim(gfs, cabi, false) + "]"
 		}
 	}
 
@@ -295,7 +306,7 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi bool) string {
 
 			// Design QPair using capital-named members, in case it gets passed
 			// across packages
-			return "tuple[first: " + t1.renderTypeNim(gfs, cabi) + ", second: " + t2.renderTypeNim(gfs, cabi) + "]"
+			return "tuple[first: " + t1.renderTypeNim(gfs, cabi, false) + ", second: " + t2.renderTypeNim(gfs, cabi, false) + "]"
 		}
 	}
 
@@ -424,26 +435,12 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi bool) string {
 	return ret // ignore const
 }
 
-func (p CppParameter) renderReturnTypeNim(gfs *nimFileState, cabi bool) string {
-	ret := p.renderTypeNim(gfs, cabi)
-	if ret == "void" {
-		ret = "void"
-	}
-
-	if p.QtClassType() && p.ParameterType != "QString" && p.ParameterType != "QByteArray" && !(p.Pointer || p.ByRef) {
-		// FIXME normalize this part
-		ret = ret
-	}
-
-	return ret
-}
-
 func (p CppParameter) parameterTypeNim(gfs *nimFileState) string {
-	if p.ParameterType == "QString" {
+	if p.ParameterType == "QString" || p.ParameterType == "QAnyStringView" {
 		return "struct_miqt_string"
 	}
 
-	if p.ParameterType == "QByteArray" {
+	if p.ParameterType == "QByteArray" || p.ParameterType == "QByteArrayView" {
 		return "struct_miqt_string"
 	}
 
@@ -463,7 +460,7 @@ func (p CppParameter) parameterTypeNim(gfs *nimFileState) string {
 		return "struct_miqt_map"
 	}
 
-	return p.renderTypeNim(gfs, true)
+	return p.renderTypeNim(gfs, true, false)
 }
 
 func (gfs *nimFileState) emitParametersNim(params []CppParameter, cabi bool, self string) string {
@@ -488,7 +485,7 @@ func (gfs *nimFileState) emitParametersNim(params []CppParameter, cabi bool, sel
 
 		} else {
 			// Ordinary parameter
-			tmp = append(tmp, p.nimParameterName()+": "+p.renderTypeNim(gfs, cabi))
+			tmp = append(tmp, p.nimParameterName()+": "+p.renderTypeNim(gfs, cabi, true))
 
 		}
 	}
@@ -545,11 +542,11 @@ func (gfs *nimFileState) emitParametersNim2CABIForwarding(m CppMethod, extra str
 }
 
 func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter, copy bool) (preamble, rvalue string) {
-	// If transfer is true, memory ownership is given to CABI (this happens when p is a return value)
+	// If copy is true, memory ownership is given to CABI (this happens when p is a return value)
 
 	nameprefix := makeNamePrefix(p.nimParameterName())
 
-	if p.ParameterType == "QString" {
+	if p.ParameterType == "QString" || p.ParameterType == "QAnyStringView" {
 		if copy {
 			preamble += gfs.ind + "var " + nameprefix + "_copy = if len(" + p.nimParameterName() + ") > 0: c_malloc(csize_t(len(" + p.nimParameterName() + "))) else: nil\n"
 			preamble += gfs.ind + "if len(" + p.nimParameterName() + ") > 0: copyMem(" + nameprefix + "_copy, addr " + p.nimParameterName() + "[0], csize_t(len(" + p.nimParameterName() + ")))\n"
@@ -557,7 +554,7 @@ func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter, copy bo
 		} else {
 			rvalue = "struct_miqt_string(data: if len(" + p.nimParameterName() + ") > 0: addr " + p.nimParameterName() + "[0] else: nil, len: csize_t(len(" + p.nimParameterName() + ")))"
 		}
-	} else if p.ParameterType == "QByteArray" {
+	} else if p.ParameterType == "QByteArray" || p.ParameterType == "QByteArrayView" {
 		if copy {
 			preamble += gfs.ind + "var " + nameprefix + "_copy = if len(" + p.nimParameterName() + ") > 0: c_malloc(csize_t(len(" + p.nimParameterName() + "))) else: nil\n"
 			preamble += gfs.ind + "if len(" + p.nimParameterName() + ") > 0: copyMem(" + nameprefix + "_copy, addr " + p.nimParameterName() + "[0], csize_t(len(" + p.nimParameterName() + ")))\n"
@@ -708,14 +705,14 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 
 		lines += gfs.ind + assignExpr + "(" + rvalue + ")\n"
 
-	} else if rt.ParameterType == "QString" {
+	} else if rt.ParameterType == "QString" || rt.ParameterType == "QAnyStringView" {
 
 		lines += gfs.ind + "let " + namePrefix + "_ms = " + rvalue + "\n"
 		lines += gfs.ind + "let " + namePrefix + "x_ret = string.fromBytes(" + namePrefix + "_ms)\n"
 		lines += gfs.ind + "c_free(" + namePrefix + "_ms.data)\n"
 		lines += gfs.ind + assignExpr + namePrefix + "x_ret\n"
 
-	} else if rt.ParameterType == "QByteArray" {
+	} else if rt.ParameterType == "QByteArray" || rt.ParameterType == "QByteArrayView" {
 		// We receive the CABI type of a miqt_string. Convert it into []byte
 		// We must free the miqt_string data pointer - this is a data copy,
 		// not an alias
@@ -728,7 +725,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 	} else if t, ok := rt.QListOf(); ok {
 		lines += gfs.ind + "var " + namePrefix + "_ma = " + rvalue + "\n"
 
-		lines += gfs.ind + "var " + namePrefix + "x_ret = newSeq[" + t.renderTypeNim(gfs, false) + "](int(" + namePrefix + "_ma.len))\n"
+		lines += gfs.ind + "var " + namePrefix + "x_ret = newSeq[" + t.renderTypeNim(gfs, false, false) + "](int(" + namePrefix + "_ma.len))\n"
 		lines += gfs.ind + "let " + namePrefix + "_outCast = cast[ptr UncheckedArray[" + t.parameterTypeNim(gfs) + "]](" + namePrefix + "_ma.data)\n"
 		lines += gfs.ind + "for i in 0 ..< " + namePrefix + "_ma.len:\n"
 		gfs.indent()
@@ -741,7 +738,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 
 		lines += gfs.ind + "var " + namePrefix + "_ma = " + rvalue + "\n"
 
-		lines += gfs.ind + namePrefix + "x_ret: HashSet[" + t.renderTypeNim(gfs, false) + "])\n"
+		lines += gfs.ind + namePrefix + "x_ret: HashSet[" + t.renderTypeNim(gfs, false, false) + "])\n"
 		lines += gfs.ind + namePrefix + "_outCast = cast[ptr UncheckedArray[" + t.parameterTypeNim(gfs) + "](" + namePrefix + "_ma.data))\n"
 		lines += gfs.ind + "for i in 0..<" + namePrefix + "_ma.len:\n"
 		gfs.indent()
@@ -753,7 +750,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 	} else if kType, vType, ok := rt.QMapOf(); ok {
 		lines += gfs.ind + "var " + namePrefix + "_mm = " + rvalue + "\n"
 
-		lines += gfs.ind + "var " + namePrefix + "x_ret: Table[" + kType.renderTypeNim(gfs, false) + ", " + vType.renderTypeNim(gfs, false) + "]\n"
+		lines += gfs.ind + "var " + namePrefix + "x_ret: Table[" + kType.renderTypeNim(gfs, false, false) + ", " + vType.renderTypeNim(gfs, false, false) + "]\n"
 		lines += gfs.ind + "var " + namePrefix + "_Keys = cast[ptr UncheckedArray[" + kType.parameterTypeNim(gfs) + "]](" + namePrefix + "_mm.keys)\n"
 		lines += gfs.ind + "var " + namePrefix + "_Values = cast[ptr UncheckedArray[" + vType.parameterTypeNim(gfs) + "]](" + namePrefix + "_mm.values)\n"
 		lines += gfs.ind + "for i in 0..<" + namePrefix + "_mm.len:\n"
@@ -816,7 +813,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 			//return assignExpr + "(" + rt.renderTypeNim(gfs, false) + "(" + rvalue + "))\n"
 			lines += gfs.ind + assignExpr + rvalue + "\n"
 		} else if rt.IsKnownEnum() || rt.IsFlagType() {
-			lines += gfs.ind + assignExpr + rt.renderTypeNim(gfs, false) + "(" + rvalue + ")\n"
+			lines += gfs.ind + assignExpr + rt.renderTypeNim(gfs, false, false) + "(" + rvalue + ")\n"
 		} else {
 
 			lines += gfs.ind + assignExpr + rvalue + "\n"
@@ -1117,7 +1114,7 @@ proc deleteLater*(self: sink ` + nimClassName + `) =
 		// 	enumShortName = cabiClassNameNim(e.ShortEnumName(), false)
 		// }
 
-		underlyingType := e.UnderlyingType.renderTypeNim(&gfs, false)
+		underlyingType := e.UnderlyingType.renderTypeNim(&gfs, false, false)
 		ret.WriteString(`
 type ` + enumName + `* = distinct ` + underlyingType + `
 `)
@@ -1187,8 +1184,8 @@ export ` + gfs.currentUnitName + `_types
 
 			preamble, forwarding := gfs.emitParametersNim2CABIForwarding(m, "")
 
-			returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
-			rawReturnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, true)
+			returnTypeDecl := m.ReturnType.renderTypeNim(&gfs, false, false)
+			rawReturnTypeDecl := m.ReturnType.renderTypeNim(&gfs, true, false)
 			rawMethodName := ncabiMethodName(c, m)
 			nimMethodName := uniqueName(&gfs, sigs, m)
 			rvalue := rawMethodName + `(` + forwarding + `)`
@@ -1249,7 +1246,8 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 		if len(virtualMethods) > 0 {
 			for _, m := range virtualMethods {
 				cbTypeName := nimClassName + m.rawMethodName() + "Proc"
-				fmt.Fprintf(&ret, "type %s* = proc(%s): %s {.raises: [], gcsafe.}\n", cbTypeName, gfs.emitParametersNim(m.Parameters, false, "self: "+nimClassName), m.ReturnType.renderReturnTypeNim(&gfs, false))
+				fmt.Fprintf(&ret, "type %s* = proc(%s): %s {.raises: [], gcsafe.}\n",
+					cbTypeName, gfs.emitParametersNim(m.Parameters, false, "self: "+nimClassName), m.ReturnType.renderTypeNim(&gfs, false, false))
 			}
 
 			// `ptr pointer` here because we always allocate sizeof(pointer) extra mem
@@ -1265,7 +1263,8 @@ type %[1]sVTable {.pure.} = object
 `, nimClassName, rawClassName)
 
 			for _, m := range virtualMethods {
-				fmt.Fprintf(&cabi, "  %s*: proc(%s): %s {.cdecl, raises: [], gcsafe.}\n", m.rawMethodName(), gfs.emitParametersNim(m.Parameters, true, "self: pointer"), m.ReturnType.renderReturnTypeNim(&gfs, true))
+				fmt.Fprintf(&cabi, "  %s*: proc(%s): %s {.cdecl, raises: [], gcsafe.}\n",
+					m.rawMethodName(), gfs.emitParametersNim(m.Parameters, true, "self: pointer"), m.ReturnType.renderTypeNim(&gfs, true, false))
 
 				cbTypeName := nimClassName + m.rawMethodName() + "Proc"
 				fmt.Fprintf(&ret, "  %s*: %s\n", m.rawMethodName(), cbTypeName)
@@ -1281,8 +1280,8 @@ type %[1]sVTable {.pure.} = object
 
 					forwarding = "self.h" + strings.TrimPrefix(forwarding, `self.h`) // TODO integrate properly
 
-					returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
-					rawReturnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, true)
+					returnTypeDecl := m.ReturnType.renderTypeNim(&gfs, false, false)
+					rawReturnTypeDecl := m.ReturnType.renderTypeNim(&gfs, true, false)
 
 					fmt.Fprintf(&cabi, `proc %[1]s(%[3]s): %[4]s {.importc: "%[2]s".}
 `, ncabiVirtualBaseName(c, m), cabiVirtualBaseName(c, m), gfs.emitParametersNim(m.Parameters, true, "self: pointer"), rawReturnTypeDecl)
@@ -1340,7 +1339,7 @@ type %[1]sVTable {.pure.} = object
 `, nimClassName, rawClassName)
 
 			for _, m := range virtualMethods {
-				returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
+				returnTypeDecl := m.ReturnType.renderTypeNim(&gfs, false, false)
 
 				fmt.Fprintf(&ret, `method %[2]s*(%[4]s): %[5]s {.base.} =
 `,
@@ -1408,8 +1407,8 @@ type %[1]sVTable {.pure.} = object
 
 				forwarding = "self.h" + strings.TrimPrefix(forwarding, `self.h`) // TODO integrate properly
 
-				returnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, false)
-				rawReturnTypeDecl := m.ReturnType.renderReturnTypeNim(&gfs, true)
+				returnTypeDecl := m.ReturnType.renderTypeNim(&gfs, false, false)
+				rawReturnTypeDecl := m.ReturnType.renderTypeNim(&gfs, true, false)
 
 				fmt.Fprintf(&cabi, `proc %[1]s(%[3]s): %[4]s {.importc: "%[2]s".}
 `, ncabiProtectedBaseName(c, m), cabiProtectedBaseName(c, m), gfs.emitParametersNim(m.Parameters, true, "self: pointer"), rawReturnTypeDecl)
@@ -1434,7 +1433,7 @@ type %[1]sVTable {.pure.} = object
 				nimParams := gfs.emitParametersNim(ctor.Parameters, false, "")
 				paramsX := ""
 				for _, p := range ctor.Parameters {
-					paramsX = paramsX + "," + p.renderTypeNim(&gfs, false)
+					paramsX = paramsX + "," + p.renderTypeNim(&gfs, false, true)
 				}
 				orig := paramsX
 				j := 0
@@ -1503,7 +1502,7 @@ type %[1]sVTable {.pure.} = object
 				nimParams := gfs.emitParametersNim(ctor.Parameters, false, "")
 				paramsX := ""
 				for _, p := range ctor.Parameters {
-					paramsX = paramsX + "," + p.renderTypeNim(&gfs, false)
+					paramsX = paramsX + "," + p.renderTypeNim(&gfs, false, true)
 				}
 				orig := paramsX
 				j := 0
@@ -1529,6 +1528,7 @@ type %[1]sVTable {.pure.} = object
 %[4]s  if inst[].h != nil: delete(move(inst[]))
   inst[].h = %[5]s(%[6]s)
   %[7]s(inst[].h)[] = addr inst[]
+  inst[].owned = true
 
 `, maybeSuffix(j), nimPkgClassName, strings.Join(vparams, ",\n    "),
 					preamble, ncabiNewName(c, i), forwarding, ncabiToVdataName(c))
