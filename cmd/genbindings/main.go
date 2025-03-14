@@ -25,10 +25,6 @@ func parsedPath(inputHeader string) string {
 	return cacheFileRoot(inputHeader) + ".ours.json"
 }
 
-func importPathForQtPackage(packageName string) string {
-	return BaseModule + "/" + packageName
-}
-
 func findHeadersInDir(srcDir string) []string {
 	content, err := os.ReadDir(srcDir)
 	if err != nil {
@@ -54,14 +50,14 @@ func findHeadersInDir(srcDir string) []string {
 	return ret
 }
 
-func pkgConfigCflags(pcName string) string {
-	stdout, err := exec.Command(`pkg-config`, `--cflags`, pcName).Output()
+func pkgConfig(pcName, what string) string {
+	stdout, err := exec.Command(`pkg-config`, what, pcName).Output()
 	if err != nil {
 		log.Printf("pkg-config(%q): %v", pcName, string(err.(*exec.ExitError).Stderr))
 		panic(err)
 	}
 
-	return string(stdout)
+	return strings.TrimSpace(string(stdout))
 }
 
 func min(a, b int) int {
@@ -115,7 +111,7 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 
 	log.Printf("Found %d header files to process.", len(includeFiles))
 
-	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfigCflags(pcName))...)
+	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfig(pcName, "--cflags"))...)
 	outDir = filepath.Join(outDir, qtModuleName)
 	os.MkdirAll(outDir, 0755)
 
