@@ -472,7 +472,9 @@ func AllowType(p CppParameter, isReturnType bool) error {
 	}
 
 	if !AllowClass(p.ParameterType) {
-		return ErrTooComplex // This whole class type has been blocked, not only as a parameter/return type
+		if !p.Pointer {
+			return ErrTooComplex // This whole class type has been blocked, not only as a parameter/return type
+		}
 	}
 
 	if strings.Contains(p.ParameterType, "(*)") { // Function pointer.
@@ -561,7 +563,11 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		return ErrTooComplex
 	}
 	if strings.HasPrefix(p.ParameterType, "QtPrivate::") {
-		return ErrTooComplex // e.g. Qt 6 qbindingstorage.h
+		// Pointers to private types are needed for metaobject generation - hence
+		// we allow these specifically but expose them as `void*`
+		if !p.Pointer {
+			return ErrTooComplex // e.g. Qt 6 qbindingstorage.h
+		}
 	}
 
 	// If any parameters are QString*, skip the method

@@ -23,10 +23,6 @@ func cacheFilePath(inputHeader string) string {
 	return filepath.Join("cachedir", strings.Replace(inputHeader, `/`, `__`, -1)+".json")
 }
 
-func importPathForQtPackage(packageName string) string {
-	return BaseModule + "/" + packageName
-}
-
 func findHeadersInDir(srcDir string) []string {
 	content, err := os.ReadDir(srcDir)
 	if err != nil {
@@ -52,19 +48,19 @@ func findHeadersInDir(srcDir string) []string {
 	return ret
 }
 
-func pkgConfigCflags(pcName string) string {
-	stdout, err := exec.Command(`pkg-config`, `--cflags`, pcName).Output()
+func pkgConfig(pcName, what string) string {
+	stdout, err := exec.Command(`pkg-config`, what, pcName).Output()
 	if err != nil {
 		panic(err)
 	}
 
-	return string(stdout)
+	return strings.TrimSpace(string(stdout))
 }
 func genUnitName(header string) string {
 	return "gen_" + strings.TrimSuffix(filepath.Base(header), `.h`)
 }
 
-func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir, nimOutdir string) {
+func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir, nimOutdir string) {
 
 	var includeFiles []string
 	for _, srcDir := range srcDirs {
@@ -77,12 +73,12 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 
 	log.Printf("Found %d header files to process.", len(includeFiles))
 
-	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfigCflags(pcName))...)
-	outDir = filepath.Join(outDir, moduleName)
+	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfig(pcName, "--cflags"))...)
+	outDir = filepath.Join(outDir, qtModuleName)
 	os.MkdirAll(outDir, 0755)
 
 	nimBaseDir := nimOutdir
-	nimOutdir = filepath.Join(nimOutdir, moduleName)
+	nimOutdir = filepath.Join(nimOutdir, qtModuleName)
 	os.MkdirAll(nimOutdir, 0755)
 
 	var processHeaders []*CppParsedHeader
@@ -153,7 +149,7 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 		}
 
 		// Update global state tracker (AFTER astTransformChildClasses)
-		addKnownTypes(moduleName, parsed)
+		addKnownTypes(qtModuleName, parsed)
 
 		processHeaders = append(processHeaders, parsed)
 	}
@@ -161,12 +157,10 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 	//
 	// PASS 2
 	//
-
-	libsSrc := fmt.Sprintf(`
-const libs = gorge("pkg-config --libs %s")
-{.passl: libs}
-`, pcName)
-	os.WriteFile(filepath.Join(nimOutdir, strings.ReplaceAll(pcName, " ", "_")+"_libs.nim"), []byte(libsSrc), 0644)
+	{
+		libsSrc := emitNimPkg(qtModuleName, pcName)
+		os.WriteFile(filepath.Join(nimOutdir, nimModulePkgName(qtModuleName)+".nim"), []byte(libsSrc), 0644)
+	}
 
 	for _, parsed := range processHeaders {
 
@@ -217,7 +211,7 @@ const libs = gorge("pkg-config --libs %s")
 			counter++
 		}
 
-		nimSrc, nim64Src, err := emitNim(parsed, filepath.Base(parsed.Filename), moduleName, pcName)
+		nimSrc, nim64Src, err := emitNim(parsed, filepath.Base(parsed.Filename), qtModuleName, pcName)
 		if err != nil {
 			log.Printf("Error in %s: %s", parsed.Filename, err)
 			continue
@@ -247,7 +241,7 @@ const libs = gorge("pkg-config --libs %s")
 
 			os.WriteFile(
 				filepath.Join(nimBaseDir, strings.ToLower(c.ClassName)+".nim"),
-				[]byte("import ./"+moduleName+"/"+genUnitName(parsed.Filename)+"\nexport "+genUnitName(parsed.Filename)), 0644)
+				[]byte("import ./"+qtModuleName+"/"+genUnitName(parsed.Filename)+"\nexport "+genUnitName(parsed.Filename)), 0644)
 		}
 		bindingCppSrc, err := emitBindingCpp(parsed, filepath.Base(parsed.Filename))
 		if err != nil {
@@ -263,7 +257,7 @@ const libs = gorge("pkg-config --libs %s")
 			panic(err)
 		}
 
-		bindingHSrc, err := emitBindingHeader(parsed, filepath.Base(parsed.Filename), moduleName)
+		bindingHSrc, err := emitBindingHeader(parsed, filepath.Base(parsed.Filename), qtModuleName)
 		if err != nil {
 			panic(err)
 		}

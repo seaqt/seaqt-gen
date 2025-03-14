@@ -13,31 +13,31 @@ import (
 )
 
 type nimFileState struct {
-	stdImports         map[string]struct{}
-	preImports         map[string]struct{}
-	imports            map[string]struct{}
-	postImports        map[string]struct{}
-	currentPackageName string
-	currentUnitName    string
-	ind                string
+	stdImports   map[string]struct{}
+	preImports   map[string]struct{}
+	imports      map[string]struct{}
+	postImports  map[string]struct{}
+	qtModuleName string
+	unitName     string
+	ind          string
 }
 
-func (gfs nimFileState) qualifiedPrefix(packageName string) string {
+func (gfs nimFileState) qualifiedPrefix(qtModuleName string) string {
 	// TODO using relative imports works as long as everything is in one giant
 	// nimble package, but what if it's not?
-	return ifv(packageName == gfs.currentPackageName, "./", "../"+packageName+"/")
+	return ifv(qtModuleName == gfs.qtModuleName, "./", "../"+qtModuleName+"/")
 }
 
 func (gfs nimFileState) qualifiedTypeImport(v lookupResultClass) string {
-	return gfs.qualifiedPrefix(v.PackageName) + v.UnitName + "_types"
+	return gfs.qualifiedPrefix(v.QtModuleName) + v.UnitName + "_types"
 }
 
 func (gfs nimFileState) qualifiedImplImport(v lookupResultClass) string {
-	return gfs.qualifiedPrefix(v.PackageName) + v.UnitName
+	return gfs.qualifiedPrefix(v.QtModuleName) + v.UnitName
 }
 
 func (gfs nimFileState) qualifiedImport(v lookupResultEnum) string {
-	return gfs.qualifiedPrefix(v.PackageName) + v.UnitName + "_types"
+	return gfs.qualifiedPrefix(v.QtModuleName) + v.UnitName + "_types"
 }
 
 func nimReservedWord(s string) bool {
@@ -51,7 +51,7 @@ func nimReservedWord(s string) bool {
 		"shl", "shr", "static", "template", "try", "tuple", "type", "using", "var",
 		"when", "while", "xor", "yield",
 		"Exception",
-		"super", "ret", "result": // not language-reserved words, but a binding-reserved words
+		"super", "ret", "result", "create", "string", "seq": // not language-reserved words, but a binding-reserved words
 		return true
 	default:
 		return false
@@ -229,6 +229,10 @@ func ncabiSetVdataName(c CppClass) string {
 	return "f" + cabiClassNameNim(c.ClassName, true) + `_setVdata`
 }
 
+func nimModulePkgName(qtModuleName string) string {
+	return strings.ToLower(qtModuleName) + "_pkg"
+}
+
 func isQObject(s string) bool {
 	return s == "QObject"
 }
@@ -315,8 +319,10 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi, isparam bool) strin
 		}
 	}
 
-	if p.ParameterType == "void" && p.Pointer {
-		return "pointer"
+	if p.Pointer {
+		if p.ParameterType == "void" || !AllowClass(p.ParameterType) {
+			return "pointer"
+		}
 	}
 
 	if p.ParameterType == "void" {
@@ -390,7 +396,7 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi, isparam bool) strin
 			if cabi || true {
 				ret += "cint"
 			} else {
-				if enumInfo, ok := KnownEnums[ft.ParameterType]; ok && enumInfo.UnitName != gfs.currentUnitName {
+				if enumInfo, ok := KnownEnums[ft.ParameterType]; ok && enumInfo.UnitName != gfs.unitName {
 					// Cross-package
 					ret += enumInfo.UnitName + "." + enumInfo.Enum.nimEnumName()
 					gfs.imports[gfs.qualifiedImport(enumInfo)] = struct{}{}
@@ -403,7 +409,7 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi, isparam bool) strin
 			if cabi || true {
 				ret += "cint"
 			} else {
-				if enumInfo.UnitName != gfs.currentUnitName {
+				if enumInfo.UnitName != gfs.unitName {
 					// Cross-package
 					ret += enumInfo.UnitName + "." + enumInfo.Enum.nimEnumName()
 					gfs.imports[gfs.qualifiedImport(enumInfo)] = struct{}{}
@@ -426,7 +432,7 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi, isparam bool) strin
 	if pkg, ok := KnownClassnames[p.ParameterType]; ok {
 		isclass = true
 		ret = pkg.UnitName + "_types." + ret
-		if pkg.UnitName != gfs.currentUnitName {
+		if pkg.UnitName != gfs.unitName {
 			gfs.imports[gfs.qualifiedTypeImport(pkg)] = struct{}{}
 		}
 	}
@@ -654,6 +660,9 @@ func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter, copy bo
 		// Single char* argument
 		rvalue = p.nimParameterName()
 
+	} else if p.Pointer && !AllowClass(p.ParameterType) {
+		// Single char* argument
+		rvalue = p.nimParameterName()
 	} else if /*(p.Pointer || p.ByRef) &&*/ p.QtClassType() {
 		// The C++ type is a pointer to Qt class
 		// We want our functions to accept the Go wrapper type, and forward as cPointer()
@@ -695,6 +704,8 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 	if rt.Void() {
 		return gfs.ind + rvalue + "\n"
 
+	} else if rt.Pointer && !AllowClass(rt.ParameterType) {
+		return gfs.ind + assignExpr + rvalue + "\n"
 	} else if rt.ParameterType == "void" && rt.Pointer {
 		return gfs.ind + assignExpr + rvalue + "\n"
 
@@ -793,7 +804,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 
 		crossPackage := pkg.UnitName + "_types."
 
-		if pkg.UnitName != gfs.currentUnitName {
+		if pkg.UnitName != gfs.unitName {
 			gfs.imports[gfs.qualifiedTypeImport(pkg)] = struct{}{}
 		}
 
@@ -830,13 +841,31 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 	return lines
 }
 
-func emitNim(src *CppParsedHeader, headerName string, packageName string, pkgConfigModule string) (string, string, error) {
+func emitNimPkg(qtModuleName, pcName string) string {
+	return fmt.Sprintf(`const
+  %[1]sCFlags* =
+    gorge("pkg-config --cflags %[2]s") &
+    (when defined(gcc) or defined(llvm): " -fPIC" else: "")
+
+  %[1]sLibs* = gorge("pkg-config --libs %[2]s")
+
+  %[1]sGenVersion* = "%[3]s"
+    ## The version used for generating the bindings
+
+  %[1]sBuildVersion* = gorge("pkg-config --modversion %[2]s")
+    ## The version used when compiling the application
+
+{.passl: %[1]sLibs}
+`, qtModuleName, pcName, pkgConfig(pcName, "--modversion"))
+}
+
+func emitNim(src *CppParsedHeader, headerName string, qtModuleName string, pcName string) (string, string, error) {
 
 	ret := strings.Builder{}
 	cabi := strings.Builder{}
 	types := strings.Builder{}
 
-	ret.WriteString(`import ./` + strings.ReplaceAll(pkgConfigModule, " ", "_") + `_libs
+	ret.WriteString(`import ./` + nimModulePkgName(qtModuleName) + `
 
 {.push raises: [].}
 
@@ -874,29 +903,26 @@ func fromBytes(T: type string, v: struct_miqt_string): string {.used.} =
 
 	// Type definition
 	gfs := nimFileState{
-		imports:            map[string]struct{}{},
-		preImports:         map[string]struct{}{},
-		stdImports:         map[string]struct{}{},
-		currentPackageName: packageName,
-		currentUnitName:    genUnitName(headerName),
-		ind:                "  ",
+		imports:      map[string]struct{}{},
+		preImports:   map[string]struct{}{},
+		stdImports:   map[string]struct{}{},
+		qtModuleName: qtModuleName,
+		unitName:     genUnitName(headerName),
+		ind:          "  ",
 	}
 
 	// messy: pkg-config flags don't include private headers
 	if headerName == "qobject.h" {
-		coreConfigModule := ifv(strings.Contains(pkgConfigModule, "Qt5"), "Qt5Core", "Qt6Core")
-		cabi.WriteString(`const qtversion = gorge("pkg-config --modversion ` + coreConfigModule + `")
-const cflags = gorge("pkg-config --cflags Qt5Core")
-import std/strutils
+		cabi.WriteString(`import std/strutils
 const privateDir = block:
   var flag = ""
-  for path in cflags.split(" "):
+  for path in QtCoreCFlags.split(" "):
     if "QtCore" in path:
-      flag = " " & path & "/" & qtversion & " " & path & "/" & qtversion & "/QtCore"
+      flag = " " & path & "/" & QtCoreBuildVersion & " " & path & "/" & QtCoreBuildVersion & "/QtCore"
       break
   flag
 
-{.compile("../libseaqt/libseaqt.cpp", cflags & privateDir).}
+{.compile("../libseaqt/libseaqt.cpp", QtCoreCFlags & privateDir).}
 
 type QObjectconnectRawSlot* = proc(args: pointer)
 
@@ -949,8 +975,8 @@ proc connectRaw*(
 	}
 
 	hasCompile := false
-	compileCpp := `const cflags = gorge("pkg-config --cflags ` + pkgConfigModule + `") & " -fPIC"
-{.compile("gen_` + strings.Replace(headerName, ".h", ".cpp", -1) + `", cflags).}
+	compileCpp := `
+{.compile("gen_` + strings.Replace(headerName, ".h", ".cpp", -1) + `", ` + qtModuleName + `CFlags).}
 
 `
 
@@ -971,7 +997,7 @@ proc connectRaw*(
 				if strings.HasPrefix(base, `QList<`) {
 					// Can't inherit
 					continue
-				} else if pkg, ok := KnownClassnames[base]; ok && pkg.UnitName != gfs.currentUnitName {
+				} else if pkg, ok := KnownClassnames[base]; ok && pkg.UnitName != gfs.unitName {
 					// Cross-package parent class
 					inherit = " of " + pkg.UnitName + "_types." + cabiClassNameNim(base, false)
 					if _, ok := gfs.preImports[gfs.qualifiedTypeImport(pkg)]; !ok {
@@ -1009,6 +1035,7 @@ export ` + pkg.UnitName + `_types
 					// The destructor must live in the same module as the type declaration meaning that
 					// we need access to the generated code even if we only shuffle pointers arouund -
 					// this might have a better solution
+					types.WriteString("import ./" + nimModulePkgName(qtModuleName) + "\n")
 					types.WriteString(compileCpp)
 					hasCompile = true
 				}
@@ -1159,17 +1186,17 @@ type ` + enumName + `* = distinct ` + underlyingType + `
 
 		}
 	}
-	gfs.preImports[gfs.qualifiedPrefix(packageName)+gfs.currentUnitName+`_types`] = struct{}{}
+	gfs.preImports[gfs.qualifiedPrefix(qtModuleName)+gfs.unitName+`_types`] = struct{}{}
 	ret.WriteString(`
-import ` + gfs.qualifiedPrefix(packageName) + gfs.currentUnitName + `_types
-export ` + gfs.currentUnitName + `_types
+import ` + gfs.qualifiedPrefix(qtModuleName) + gfs.unitName + `_types
+export ` + gfs.unitName + `_types
 
 %%_IMPORTLIBS_%%
 %%_CABI_%%
 `)
 	for _, c := range src.Classes {
 		nimClassName := cabiClassNameNim(c.ClassName, false)
-		nimPkgClassName := gfs.currentUnitName + `_types.` + nimClassName
+		nimPkgClassName := gfs.unitName + `_types.` + nimClassName
 		rawClassName := cabiClassNameNim(c.ClassName, true)
 		virtualMethods := c.VirtualMethods()
 		protectedMethods := c.ProtectedMethods()
