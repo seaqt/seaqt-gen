@@ -99,6 +99,9 @@ func (p CppParameter) RenderTypeCabi() string {
 	} else if inner1, inner2, ok := p.QPairOf(); ok {
 		return "struct seaqt_map " + cppComment("tuple of "+inner1.RenderTypeCabi()+" and "+inner2.RenderTypeCabi())
 
+	} else if !AllowClass(p.ParameterType) && p.Pointer {
+		// Needed for generating metadata
+		return ifv(p.Const, "const void*", "void*")
 	} else if (p.Pointer || p.ByRef) && p.QtClassType() {
 		if p.PointerCount > 1 {
 			return cabiClassName(p.ParameterType) + strings.Repeat("*", p.PointerCount)
@@ -433,6 +436,8 @@ func emitCABI2CppForwarding(p CppParameter, indent string, delete bool) (preambl
 	} else if _, ok := p.QSetOf(); ok {
 		panic("QSet<> arguments are not yet implemented") // n.b. doesn't seem to exist in QtCore/QtGui/QtWidgets at all
 
+	} else if p.Pointer && !AllowClass(p.ParameterType) {
+		return preamble, "static_cast<" + p.RenderTypeQtCpp() + ">(" + p.cParameterName() + ")"
 	} else if p.ByRef {
 		if p.Pointer {
 			// By ref and by pointer
