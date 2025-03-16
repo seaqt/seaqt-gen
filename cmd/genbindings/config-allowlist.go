@@ -627,8 +627,10 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"QByteArrayList",
 		"QRhiTexture", // Private type?
 		"GLuint",
+		"VkDevice",
 		"VkImage",
 		"VkImageLayout",
+		"VkPhysicalDevice",
 		"____last____":
 		return ErrTooComplex
 	}
