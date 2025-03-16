@@ -845,7 +845,7 @@ func emitNimPkg(qtModuleName, pcName string) string {
 	return fmt.Sprintf(`const
   %[1]sCFlags* =
     gorge("pkg-config --cflags %[2]s") &
-    (when declared(gcc) or declared(llvm): " -fPIC" else: "")
+    (when defined(gcc) or defined(llvm): " -fPIC" else: "")
 
   %[1]sLibs* = gorge("pkg-config --libs %[2]s")
 
