@@ -27361,7 +27361,10 @@ Blocking method "setDeviceExtensions"([Param(const QByteArrayList& extensions)])
 Blocking method "deviceExtensions"([]): Type declaration is too complex to parse
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtQuick/qquickgraphicsdevice.h"...
 Blocking method "fromOpenGLContext"([Param(QOpenGLContext* context)]): Type declaration is too complex to parse
+Blocking method "fromPhysicalDevice"([Param(VkPhysicalDevice physicalDevice)]): Type declaration is too complex to parse
+Blocking method "fromDeviceObjects"([Param(VkPhysicalDevice physicalDevice) Param(VkDevice device) Param(int queueFamilyIndex)]): Type declaration is too complex to parse
 Blocking method "fromRhi"([Param(QRhi* rhi)]): Type declaration is too complex to parse
+Blocking method "fromDeviceObjects4"([Param(VkPhysicalDevice physicalDevice) Param(VkDevice device) Param(int queueFamilyIndex) Param(int? queueIndex)]): Type declaration is too complex to parse
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtQuick/qquickimageprovider.h"...
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtQuick/qquickitem.h"...
 Blocking method "transform"([]): Type declaration is too complex to parse
