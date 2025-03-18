@@ -1501,7 +1501,7 @@ type %[1]sVTable* {.inheritable, pure.} = object
     inst[].h = nil
     inst[].owned = false,
 
-`, rawClassName, nimClassName, ncabiVTableName(c))
+`, rawClassName, nimClassName, ncabiVdataName(c))
 			for _, m := range virtualMethods {
 				fmt.Fprintf(&ret, `  %[1]s: %[2]s,
 `, m.rawMethodName(), ncabiMethodCallbackName(c, m))
