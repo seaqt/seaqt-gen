@@ -1271,7 +1271,7 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 
 `, cbTypeName, cbType, ncabiSlotCallbackName(c, m), strings.Join(namedParams, ", "),
 					conversion, strings.Join(paramNames, `, `), ncabiConnectName(c, m),
-					m.nimMethodName(), nimPkgClassName)
+					titleCase(m.nimMethodName()), nimPkgClassName)
 			}
 		}
 
@@ -1284,11 +1284,13 @@ proc on%[8]s*(self: %[9]s, slot: %[1]s) =
 
 			fmt.Fprintf(&cabi, `proc %[2]s(self: pointer): pointer {.importc: "%[3]s".}
 proc %[4]s(self: pointer): pointer {.importc: "%[5]s".}
+
 type %[1]sVTable {.pure.} = object
   destructor*: proc(self: pointer) {.cdecl, raises:[], gcsafe.}
 `, rawClassName, ncabiVTableName(c), cabiVTableName(c), ncabiVdataName(c), cabiVdataName(c))
 
-			fmt.Fprintf(&ret, `type %[1]sVTable* {.inheritable, pure.} = object
+			fmt.Fprintf(&ret, `
+type %[1]sVTable* {.inheritable, pure.} = object
   vtbl: %[2]sVTable
 `, nimClassName, rawClassName)
 
@@ -1299,6 +1301,8 @@ type %[1]sVTable {.pure.} = object
 				cbTypeName := nimClassName + m.rawMethodName() + "Proc"
 				fmt.Fprintf(&ret, "  %s*: %s\n", m.rawMethodName(), cbTypeName)
 			}
+
+			ret.WriteString("\n")
 
 			for _, m := range virtualMethods {
 				// Add a package-private function to call the C++ base class method
@@ -1324,8 +1328,11 @@ type %[1]sVTable {.pure.} = object
 						gfs.emitCabiToNim("", m.ReturnType, ncabiVirtualBaseName(c, m)+`(`+forwarding+`)`),
 					)
 				}
+			}
 
-				// Add a function to set the virtual override handle
+			ret.WriteString("\n")
+
+			for _, m := range virtualMethods {
 
 				conversion := ""
 
@@ -1366,6 +1373,7 @@ type %[1]sVTable {.pure.} = object
 
 			fmt.Fprintf(&ret, `type Virtual%[1]s* {.inheritable.} = ref object of %[1]s
   vtbl*: %[2]sVTable
+
 `, nimClassName, rawClassName)
 
 			for _, m := range virtualMethods {
@@ -1389,9 +1397,13 @@ type %[1]sVTable {.pure.} = object
 						nimClassName, m.nimMethodName(), strings.Join(paramNames, ", "))
 
 				} else {
-					fmt.Fprintf(&ret, "  raiseAssert(\"missing implementation of %s\")\n", cabiVirtualBaseName(c, m))
+					fmt.Fprintf(&ret, "  raiseAssert(\"missing implementation of %s.%s\")\n", nimClassName, m.nimMethodName())
 				}
+			}
 
+			ret.WriteString("\n")
+
+			for _, m := range virtualMethods {
 				conversion := ""
 
 				{
@@ -1424,6 +1436,9 @@ type %[1]sVTable {.pure.} = object
 						ret.WriteString(gfs.ind + rvalue + "\n\n")
 					}
 				}
+			}
+			if len(virtualMethods) > 0 {
+				ret.WriteString("\n")
 			}
 		}
 
