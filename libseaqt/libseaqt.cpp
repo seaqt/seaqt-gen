@@ -5,17 +5,18 @@
 
 #include "../QtCore/gen_qmetaobject.h"
 #include "../QtCore/gen_qobject.h"
+
 #include <private/qobject_p.h>
 
 extern "C" {
 
-void miqt_exec_callback_QObject(intptr_t slot, void **args);
-
-void miqt_exec_callback_QObject_release(intptr_t slot);
+typedef void (*QObject_connectRawSlot_callback)(intptr_t, void **a);
+typedef void (*QObject_connectRawSlot_release)(intptr_t);
 
 QMetaObject__Connection *
 QObject_connectRawSlot(QObject *sender, const char *signal, QObject *receiver,
-                       intptr_t slot, void (*release)(intptr_t),
+                       intptr_t slot, QObject_connectRawSlot_callback callback,
+                       QObject_connectRawSlot_release release,
                        Qt::ConnectionType type,
                        const QMetaObject *senderMetaObject) {
   // Mix between QFunctorSlotObject and QSlotObject where the signal is found by
@@ -26,16 +27,19 @@ QObject_connectRawSlot(QObject *sender, const char *signal, QObject *receiver,
   // More info: https://woboq.com/blog/how-qt-signals-slots-work-part2-qt5.html
   class QCSlotObject : public QtPrivate::QSlotObjectBase {
     intptr_t slot;
+    QObject_connectRawSlot_callback callback;
+    QObject_connectRawSlot_release release;
+
     static void impl(int which, QSlotObjectBase *this_, QObject *r, void **a,
                      bool *ret) {
+      QCSlotObject *self = static_cast<QCSlotObject *>(this_);
       switch (which) {
       case Destroy:
-        miqt_exec_callback_QObject_release(
-            static_cast<QCSlotObject *>(this_)->slot);
-        delete static_cast<QCSlotObject *>(this_);
+        self->release(self->slot);
+        delete self;
         break;
       case Call:
-        miqt_exec_callback_QObject(static_cast<QCSlotObject *>(this_)->slot, a);
+        self->callback(self->slot, a);
         break;
       case Compare: // not implemented
       case NumOperations:
@@ -44,9 +48,13 @@ QObject_connectRawSlot(QObject *sender, const char *signal, QObject *receiver,
     }
 
   public:
-    explicit QCSlotObject(intptr_t slot) : QSlotObjectBase(&impl), slot(slot) {}
+    explicit QCSlotObject(intptr_t slot,
+                          QObject_connectRawSlot_callback callback,
+                          QObject_connectRawSlot_release release)
+        : QSlotObjectBase(&impl), slot(slot), callback(callback),
+          release(release) {}
   };
-  auto slotObj = new QCSlotObject(slot);
+  auto slotObj = new QCSlotObject(slot, callback, release);
   auto signal_index = senderMetaObject->indexOfSignal(signal + 1);
 
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 3)
@@ -57,6 +65,5 @@ QObject_connectRawSlot(QObject *sender, const char *signal, QObject *receiver,
   return new QMetaObject::Connection(
       QObjectPrivate::connect(sender, signal_index, receiver, slotObj, type));
 #endif
-
 }
 }

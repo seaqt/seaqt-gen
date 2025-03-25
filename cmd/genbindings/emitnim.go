@@ -913,7 +913,7 @@ func fromBytes(T: type string, v: struct_miqt_string): string {.used.} =
 
 	// messy: pkg-config flags don't include private headers
 	if headerName == "qobject.h" {
-		ret.WriteString(`import std/strutils
+		cabi.WriteString(`import std/strutils
 const privateDir = block:
   var flag = ""
   for path in QtCoreCFlags.split(" "):
@@ -924,25 +924,52 @@ const privateDir = block:
 
 {.compile("../libseaqt/libseaqt.cpp", QtCoreCFlags & privateDir).}
 
-type QObject_connectSlot* = proc(args: pointer) {.gcsafe, raises: [].}
+type QObjectconnectRawSlot* = proc(args: pointer)
 
-proc miqt_exec_callback_QObject(slot: int, args: pointer) {.exportc.} =
-  let slot = cast[ptr QObject_connectSlot](slot)
+proc QObject_slot_callback_connectRaw(slot: int, args: pointer) {.cdecl.} =
+  let slot = cast[ptr QObjectconnectRawSlot](slot)
   slot[](args)
 
-proc miqt_exec_callback_QObject_release(slot: int) {.exportc.} =
-  let slot = cast[ref QObject_connectSlot](slot)
+proc QObject_slot_callback_connectRaw_release(slot: int) {.cdecl.} =
+  let slot = cast[ref QObjectconnectRawSlot](slot)
   GC_unref(slot)
 
-proc QObject_connectRawSlot*(
+proc fcQObject_connectRawSlot(
   sender: pointer,
   signal: cstring,
   receiver: pointer,
   slot: int,
+  callback: pointer,
   release: pointer,
-  typeX: cint,
+  typeVal: cint,
   senderMetaObject: pointer,
-): pointer {.importc.}
+): pointer {.importc: "QObject_connectRawSlot".}
+
+proc connectRaw*(
+    _: type gen_qobject_types.QObject,
+    sender: gen_qobject_types.QObject,
+    signal: cstring,
+    receiver: gen_qobject_types.QObject,
+    slot: QObjectconnectRawSlot,
+    typeVal: cint,
+    senderMetaObject: gen_qobjectdefs_types.QMetaObject,
+): gen_qobjectdefs_types.QMetaObjectConnection =
+  var tmp = new QObjectconnectRawSLot
+  tmp[] = slot
+  GC_ref(tmp)
+  gen_qobjectdefs_types.QMetaObjectConnection(
+    h: fcQObject_connectRawSlot(
+      sender.h,
+      signal,
+      receiver.h,
+      cast[int](addr tmp[]),
+      QObject_slot_callback_connectRaw,
+      QObject_slot_callback_connectRaw_release,
+      typeVal,
+      senderMetaObject.h,
+    ),
+    owned: true,
+  )
 
 `)
 	}
