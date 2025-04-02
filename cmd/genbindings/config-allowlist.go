@@ -66,7 +66,7 @@ func InsertTypedefs(qt6 bool) {
 
 }
 
-func Widgets_AllowHeader(fullpath string) bool {
+func AllowHeader(fullpath string) bool {
 	fname := filepath.Base(fullpath)
 
 	if strings.HasSuffix(fname, `_impl.h`) {
@@ -309,6 +309,24 @@ func AllowMethod(className string, mm CppMethod) error {
 		if strings.HasSuffix(p.ParameterType, "Private") {
 			return ErrTooComplex // Skip private type
 		}
+		if className == "QMediaPlayer" || className == "QCamera" {
+			if p.ParameterType == "QVideoWidget" || p.ParameterType == "QGraphicsVideoItem" {
+				return ErrTooComplex // circular dep
+			}
+		}
+		if className == "QSignalMapper" && p.ParameterType == "QWidget" {
+			return ErrTooComplex // circular dep
+		}
+		if className == "QActionEvent" && p.ParameterType == "QAction" {
+			return ErrTooComplex // circular dep
+		}
+	}
+	if className == "QWebElement" && mm.ReturnType.ParameterType == "QWebFrame" {
+		return ErrTooComplex // circular dep
+	}
+	if className == "QActionEvent" && mm.ReturnType.ParameterType == "QAction" {
+		// TODO allow in qt6 where QAction has moved to QtGui
+		return ErrTooComplex // circular dep in Qt5
 	}
 	if strings.HasSuffix(mm.ReturnType.ParameterType, "Private") {
 		return ErrTooComplex // Skip private type
@@ -400,7 +418,7 @@ func AllowCtor(className string, mm CppMethod) bool {
 	}
 
 	// Default allow
-	return true
+	return AllowMethod(className, mm) == nil
 }
 
 // AllowType controls whether to permit binding of a method, if a method uses

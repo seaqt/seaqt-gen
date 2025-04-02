@@ -71,7 +71,7 @@ func cabiOverrideVirtualName(c CppClass, m CppMethod) string {
 }
 
 func cppSubclassName(c CppClass) string {
-	return "MiqtVirtual" + strings.Replace(c.ClassName, `::`, ``, -1)
+	return "Virtual" + strings.Replace(c.ClassName, `::`, ``, -1)
 }
 
 func (p CppParameter) RenderTypeCabi() string {
@@ -452,7 +452,11 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		// C++ has given us a QByteArray. CABI needs this as a struct miqt_string
 		// Do not free the data, the caller will free it
 
-		shouldReturn = ifv(p.Const, "const ", "") + "QByteArray " + namePrefix + "_qb = "
+		if p.Pointer {
+			shouldReturn = ifv(p.Const, "const ", "") + "QByteArray& " + namePrefix + "_qb = *"
+		} else {
+			shouldReturn = ifv(p.Const, "const ", "") + "QByteArray " + namePrefix + "_qb = "
+		}
 
 		afterCall += indent + "struct miqt_string " + namePrefix + "_ms;\n"
 		afterCall += indent + namePrefix + "_ms.len = " + namePrefix + "_qb.length();\n"
@@ -764,9 +768,9 @@ func cabiPreventStructDeclaration(className string) bool {
 func emitBindingHeader(src *CppParsedHeader, filename string, packageName string) (string, error) {
 	ret := strings.Builder{}
 
-	includeGuard := "MIQT_" + strings.ToUpper(strings.Replace(strings.Replace(packageName, `/`, `_`, -1), `-`, `_`, -1)) + "_GEN_" + strings.ToUpper(strings.Replace(strings.Replace(filename, `.`, `_`, -1), `-`, `_`, -1))
+	includeGuard := "SEAQT_" + strings.ToUpper(strings.Replace(strings.Replace(packageName, `/`, `_`, -1), `-`, `_`, -1)) + "_GEN_" + strings.ToUpper(strings.Replace(strings.Replace(filename, `.`, `_`, -1), `-`, `_`, -1))
 
-	bindingInclude := "../libmiqt/libmiqt.h"
+	bindingInclude := "../libseaqt-runtime.h"
 
 	if strings.Contains(packageName, `/`) {
 		bindingInclude = "../" + bindingInclude
@@ -828,7 +832,6 @@ extern "C" {
 	ret.WriteString("\n")
 
 	for _, c := range src.Classes {
-
 		className := cabiClassName(c.ClassName)
 		virtualMethods := c.VirtualMethods()
 		protectedMethods := c.ProtectedMethods()
@@ -990,7 +993,6 @@ extern "C" {
 		protectedMethods := c.ProtectedMethods()
 
 		if len(virtualMethods) > 0 {
-
 			overriddenClassName := cppSubclassName(c)
 
 			ret.WriteString("class " + overriddenClassName + " final : public " + cppClassName + " {\n" +
