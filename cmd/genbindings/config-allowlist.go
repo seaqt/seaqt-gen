@@ -66,7 +66,7 @@ func InsertTypedefs(qt6 bool) {
 
 }
 
-func Widgets_AllowHeader(fullpath string) bool {
+func AllowHeader(fullpath string) bool {
 	fname := filepath.Base(fullpath)
 
 	if strings.HasSuffix(fname, `_impl.h`) {
@@ -309,6 +309,35 @@ func AllowMethod(className string, mm CppMethod) error {
 		if strings.HasSuffix(p.ParameterType, "Private") {
 			return ErrTooComplex // Skip private type
 		}
+		if strings.Contains(p.ParameterType, "ExecutionEngine") {
+			return ErrTooComplex // Skip private type
+		}
+
+		if className == "QMediaPlayer" {
+			if p.ParameterType == "QVideoWidget" || p.ParameterType == "QGraphicsVideoItem" {
+				return ErrTooComplex // circular dep
+			}
+		}
+		if className == "QSignalMapper" && p.ParameterType == "QWidget" {
+			return ErrTooComplex // circular dep
+		}
+		if className == "QQuickWebEngineProfile" && p.ParameterType == "QQuickWebEngineDownloadRequest" {
+			// TODO  Note: To use from C++ static_cast download to QWebEngineDownloadRequest
+			return ErrTooComplex // circular dep
+		}
+		if className == "QActionEvent" && p.ParameterType == "QAction" {
+			return ErrTooComplex // circular dep
+		}
+	}
+	if className == "QQuickWebEngineProfile" && mm.ReturnType.ParameterType == "QQuickWebEngineScriptCollection" {
+		return ErrTooComplex // circular dep
+	}
+	if className == "QWebElement" && mm.ReturnType.ParameterType == "QWebFrame" {
+		return ErrTooComplex // circular dep
+	}
+	if className == "QActionEvent" && mm.ReturnType.ParameterType == "QAction" {
+		// TODO allow in qt6 where QAction has moved to QtGui
+		return ErrTooComplex // circular dep in Qt5
 	}
 	if strings.HasSuffix(mm.ReturnType.ParameterType, "Private") {
 		return ErrTooComplex // Skip private type
@@ -498,6 +527,9 @@ func AllowType(p CppParameter, isReturnType bool) error {
 	if strings.HasPrefix(p.ParameterType, "QWebEngineCallback<") {
 		return ErrTooComplex // Function pointer types in QtWebEngine
 	}
+	if strings.HasPrefix(p.ParameterType, "QSharedPointer<") {
+		return ErrTooComplex
+	}
 
 	if strings.HasPrefix(p.ParameterType, "std::") {
 		// std::initializer           e.g. qcborarray.h
@@ -624,6 +656,21 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"QWebFrameAdapter",                // Qt 5 Webkit: Used by e.g. qwebframe.h but never defined anywhere
 		"QWebPageAdapter",                 // ...
 		"QQmlWebChannelAttached",          // Qt 5 qqmlwebchannel.h. Need to add QML support for this to work
+		"QV4::ExecutionEngine",            // QML stuff onwards
+		"QQmlComponentAttached",           // ..
+		"QOpenGLFramebufferObject",        // ..
+		"QOpenGLContext",                  // ..
+		"QQuickCloseEvent",                // ..
+		"QOpenGLShaderProgram",            // ..
+		"QRhiResourceUpdateBatch",         // ..
+		"QQmlV4Function",                  // ..
+		"QByteArrayList",
+		"QRhiTexture", // Private type?
+		"GLuint",
+		"VkDevice",
+		"VkImage",
+		"VkImageLayout",
+		"VkPhysicalDevice",
 		"____last____":
 		return ErrTooComplex
 	}

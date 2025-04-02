@@ -16,7 +16,7 @@ DOCKEREXEC = mkdir -p "$$(go env GOCACHE)" && \
 	/bin/bash -c
 
 .PHONY: all
-all: genbindings
+all: genbindings copy-libseaqt
 
 docker/genbindings.docker-buildstamp: docker/genbindings.Dockerfile
 	$(DOCKER) build -t miqt/genbindings:latest -f docker/genbindings.Dockerfile .
@@ -31,6 +31,17 @@ clean:
 genbindings: $(BUILDSTAMPS)
 	$(DOCKEREXEC) 'cd cmd/genbindings && go build && ./genbindings'
 
-.PHONY: build-all
-build-all: $(BUILDSTAMPS)
-	$(DOCKEREXEC) 'go build ./...'
+copy-libseaqt: genbindings
+	cd gen/ ;\
+	for a in *seaqt-*; do cp -ar ../libseaqt $$a/seaqt; done ;
+
+gencommits: copy-libseaqt
+	cd gen/ ;\
+	git submodule foreach git add -A ;\
+	git submodule foreach 'git commit -am "update bindings" || :'
+
+.PHONY : all clean genbindings gencommits copy-libseaqt github-ssh
+
+github-ssh:
+	git config url."git@github.com:".insteadOf "https://github.com/"
+	git submodule foreach --recursive 'git config url."git@github.com:".insteadOf "https://github.com/"'
