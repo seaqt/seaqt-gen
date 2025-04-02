@@ -1,0 +1,20 @@
+[submodule "gen/seaqt-5.15"]
+	path = gen/seaqt-5.15
+	url = https://github.com/seaqt/seaqt.git
+	branch = qt-5.15
+[submodule "gen/seaqt-6.4"]
+	path = gen/seaqt-6.4
+	url = https://github.com/seaqt/seaqt.git
+	branch = qt-6.4
+[submodule "gen/seaqt-6.5"]
+	path = gen/seaqt-6.5
+	url = https://github.com/seaqt/seaqt.git
+	branch = qt-6.5
+[submodule "gen/seaqt-6.8"]
+	path = gen/seaqt-6.8
+	url = https://github.com/seaqt/seaqt.git
+	branch = qt-6.8
+[submodule "gen/seaqt-6.11"]
+	path = gen/seaqt-6.11
+	url = https://github.com/seaqt/seaqt.git
+	branch = qt-6.11
