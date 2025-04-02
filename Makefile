@@ -25,3 +25,11 @@ test-cmd: cmd/miqt-docker/miqt-docker
 .PHONY: build-all
 build-all: cmd/miqt-docker/miqt-docker
 	./cmd/miqt-docker/miqt-docker genbindings go build ./...
+
+# reset-gen is used when rebasing the submodules, to reset the "qt-<version>" branches
+reset-gen:
+	git submodule update --init --recursive
+	for name in gen/seaqt-*; do \
+		git -C $$name switch $$(git config -f .gitmodules submodule.$$name.branch); \
+		git -C $$name reset --hard $$(git -C $$name rev-list --max-parents=0 HEAD); \
+	done
