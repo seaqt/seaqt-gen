@@ -26,6 +26,8 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 			"PrintSupport", "Script", "Svg", "WebChannel",
 			"WebEngineCore",
 
+			"Qml", "Quick",
+
 			// TODO Not sure where these are from :)
 			"WebKit", "WebKitWidgets"}
 
@@ -52,9 +54,9 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 			"Core", "Gui", "Widgets", "Network", "Multimedia", "MultimediaWidgets",
 
 			"PrintSupport", "Svg", "SvgWidgets", "SpatialAudio", "WebChannel",
-			"WebEngineCore", "WebEngineWidgets",
+			"WebEngineCore", "WebEngineQuick", "WebEngineWidgets",
 
-			"Qml",
+			"Qml", "Quick",
 		}
 
 		for _, lib := range libs6 {
