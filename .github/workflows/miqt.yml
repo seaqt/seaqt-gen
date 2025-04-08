@@ -28,9 +28,24 @@ jobs:
     - name: Assert no changes
       run: git submodule foreach 'git update-index --really-refresh && git diff-index HEAD'
     
-  miqt_linux64_qt5:
+  miqt_linux64_qt5_c:
     runs-on: ubuntu-24.04
     
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Linux64 docker build
+      run: docker build -t miqt/linux64:qt5 -f docker/linux64-go1.19-qt5.15-dynamic.Dockerfile .
+
+    - name: Linux64 C bindings compile and test
+      run: |
+        docker run -v $PWD:/src -w /src miqt/linux64:qt5 /bin/bash -c 'git config --global --add safe.directory "*" && make test-gen-515'
+
+  miqt_linux64_qt5_nim:
+    runs-on: ubuntu-24.04
+
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -43,7 +58,11 @@ jobs:
     - name: Linux64 docker build
       run: docker build -t miqt/linux64:qt5 -f docker/linux64-go1.19-qt5.15-dynamic.Dockerfile .
     
-    - name: Linux64 bindings compile and test
+    - name: Linux64 C bindings compile and test
+      run: |
+        docker run -v $PWD:/src -w /src miqt/linux64:qt5 /bin/bash -c 'git config --global --add safe.directory "*" && make test-gen-515'
+
+    - name: Linux64 Nim bindings compile and test
       run: |
         cp $(which nimble) $PWD
         docker run -v $PWD:/src -w /src miqt/linux64:qt5 /bin/bash -c 'git config --global --add safe.directory "*" && cd examples && QT_QPA_PLATFORM=offscreen ../nimble test515'
