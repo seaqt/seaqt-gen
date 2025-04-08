@@ -201,6 +201,11 @@ func AllowClass(className string) bool {
 		"QDeferredDeleteEvent",       // Qt 6. Hidden/undocumented class in Qt 6.4, moved to private header in Qt 6.7. Intended for test use only
 		"QQmlV4Function",             // Qt 6. Not part of the interface
 
+		"QNativeInterface::QSGOpenGLTexture", // Abstract class, cannot be instantiated (?)
+		"QNativeInterface::QSGVulkanTexture", // ..
+
+		"QSGMaterialRhiShader", // Contains complex return values that need additional fixing
+
 		"QUntypedPropertyData::InheritsQUntypedPropertyData", // qpropertyprivate.h . Hidden/undocumented class in Qt 6.4, removed in 6.7
 		"____last____":
 		return false
@@ -310,6 +315,10 @@ func AllowMethod(className string, mm CppMethod) error {
 			return ErrTooComplex // Skip private type
 		}
 		if className == "QSignalMapper" && p.ParameterType == "QWidget" {
+			return ErrTooComplex // circular dep
+		}
+		if className == "QQuickWebEngineProfile" && p.ParameterType == "QQuickWebEngineDownloadRequest" {
+			// TODO  Note: To use from C++ static_cast download to QWebEngineDownloadRequest
 			return ErrTooComplex // circular dep
 		}
 	}
@@ -627,6 +636,8 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"QWebFrameAdapter",                // Qt 5 Webkit: Used by e.g. qwebframe.h but never defined anywhere
 		"QWebPageAdapter",                 // ...
 		"QQmlWebChannelAttached",          // Qt 5 qqmlwebchannel.h. Need to add QML support for this to work
+		"QOpenGLContext",                  // ..
+		"QQuickCloseEvent",                // ..
 		"____last____":
 		return ErrTooComplex
 	}
