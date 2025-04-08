@@ -39,7 +39,7 @@ jobs:
 
     - name: Linux64 C bindings compile and test
       run: |
-        make docker-test-gen-5.15'
+        make docker-test-gen-5.15
 
   miqt_linux64_qt6_c:
     runs-on: ubuntu-24.04
@@ -52,7 +52,7 @@ jobs:
 
     - name: Linux64 C bindings compile and test
       run: |
-        make docker-test-gen-6.4'
+        make docker-test-gen-6.4
 
   miqt_linux64_qt5_nim:
     runs-on: ubuntu-24.04
