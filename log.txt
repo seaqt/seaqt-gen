@@ -5716,9 +5716,7 @@ Skipping method "operator=" with complex type
 ==> NOT IMPLEMENTED "FieldDecl"
 ==> NOT IMPLEMENTED "FieldDecl"
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-Skipping method "action" with complex type
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-Skipping method "before" with complex type
 -> Processing class "QFileOpenEvent"...
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
@@ -12253,8 +12251,6 @@ Skipping method "operator=" with complex type
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
 ==> NOT IMPLEMENTED CXXMethodDecl->"DeprecatedAttr"
-Skipping method "setVideoOutput" with complex type
-Skipping method "setVideoOutput" with complex type
 ==> NOT IMPLEMENTED CXXMethodDecl->"DeprecatedAttr"
 ==> NOT IMPLEMENTED CXXMethodDecl->"DeprecatedAttr"
 ==> NOT IMPLEMENTED CXXMethodDecl->"DeprecatedAttr"
@@ -13315,7 +13311,6 @@ Clang worker: starting
 -> Processing class "QWebElementPrivate"...
 -> Skipping (There's no content to include)
 -> Processing class "QWebElement"...
-Skipping method "webFrame" with complex type
 ==> NOT IMPLEMENTED "FieldDecl"
 ==> NOT IMPLEMENTED "FieldDecl"
 -> Processing class "QWebElementCollectionPrivate"...
@@ -21068,9 +21063,7 @@ Skipping method "operator=" with complex type
 ==> NOT IMPLEMENTED "FieldDecl"
 -> Processing class "QActionEvent"...
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-Skipping method "action" with complex type
 ==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-Skipping method "before" with complex type
 ==> NOT IMPLEMENTED "FieldDecl"
 ==> NOT IMPLEMENTED "FieldDecl"
 -> Processing class "QFileOpenEvent"...
@@ -27936,43 +27929,6 @@ Processing "/usr/include/x86_64-linux-gnu/qt6/QtWebEngineCore/qwebengineurlschem
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtWebEngineCore/qwebengineurlschemehandler.h"...
 Blocking method "qt_metacall"([Param(QMetaObject::Call param1) Param(int param2) Param(void** param3)]): Type declaration is too complex to parse
 Processing 30 file(s) completed
-Found 4 header files to process.
-Clang worker: starting
-Clang worker: starting
--> Processing class "QQuickWebEngineDownloadRequest"...
--> Skipping (There's no content to include)
--> Processing class "QQuickWebEngineSettings"...
--> Skipping (There's no content to include)
--> Processing class "QWebEngineClientCertificateStore"...
--> Skipping (There's no content to include)
--> Processing class "QWebEngineCookieStore"...
--> Skipping (There's no content to include)
--> Processing class "QWebEngineNotification"...
--> Skipping (There's no content to include)
--> Processing class "QWebEngineUrlRequestInterceptor"...
--> Skipping (There's no content to include)
--> Processing class "QWebEngineUrlSchemeHandler"...
--> Skipping (There's no content to include)
--> Processing class "QQuickWebEngineScriptCollection"...
--> Skipping (There's no content to include)
--> Processing class "QQuickWebEngineProfilePrivate"...
--> Skipping (There's no content to include)
--> Processing class "QQuickWebEngineProfile"...
-==> NOT IMPLEMENTED "VarDecl"
-==> NOT IMPLEMENTED CXXMethodDecl->"CompoundStmt"
-Skipping method "userScripts" with complex type
-Skipping method "downloadRequested" with complex type
-Skipping method "downloadFinished" with complex type
-==> NOT IMPLEMENTED "FieldDecl"
-Processing "/usr/include/x86_64-linux-gnu/qt6/QtWebEngineQuick/qquickwebengineprofile.h"...
-Blocking method "qt_metacall"([Param(QMetaObject::Call param1) Param(int param2) Param(void** param3)]): Type declaration is too complex to parse
-Processing "/usr/include/x86_64-linux-gnu/qt6/QtWebEngineQuick/qtwebenginequick-config.h"...
-Nothing in this header was bindable.
-Processing "/usr/include/x86_64-linux-gnu/qt6/QtWebEngineQuick/qtwebenginequickglobal.h"...
-Nothing in this header was bindable.
-Processing "/usr/include/x86_64-linux-gnu/qt6/QtWebEngineQuick/qtwebenginequickversion.h"...
-Nothing in this header was bindable.
-Processing 4 file(s) completed
 Found 3 header files to process.
 Clang worker: starting
 Clang worker: starting

@@ -52,7 +52,7 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 			"Core", "Gui", "Widgets", "Network", "Multimedia", "MultimediaWidgets",
 
 			"PrintSupport", "Svg", "SvgWidgets", "SpatialAudio", "WebChannel",
-			"WebEngineCore", "WebEngineQuick", "WebEngineWidgets",
+			"WebEngineCore", "WebEngineWidgets",
 
 			"Qml",
 		}

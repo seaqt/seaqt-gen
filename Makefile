@@ -33,7 +33,9 @@ genbindings: $(BUILDSTAMPS)
 
 copy-libseaqt: genbindings
 	cd gen/ ;\
-	for a in *seaqt-*; do cp -ar ../libseaqt $$a/seaqt; done ;
+	for a in *seaqt-*; do cp -ar ../libseaqt/* $$a; done ;\
+	for a in *seaqt-5.15; do cp -ar ../libseaqt-5.15/* $$a; done ;\
+	for a in *seaqt-6.4; do echo $a; cp -ar ../libseaqt-6.4/* $$a; done ;
 
 gencommits: copy-libseaqt
 	cd gen/ ;\
@@ -45,3 +47,11 @@ gencommits: copy-libseaqt
 github-ssh:
 	git config url."git@github.com:".insteadOf "https://github.com/"
 	git submodule foreach --recursive 'git config url."git@github.com:".insteadOf "https://github.com/"'
+
+test-gen-5.15: $(BUILDSTAMPS)
+	$(DOCKEREXEC) 'cd gen/seaqt-5.15 && make -j$$(nproc) test'
+
+test-gen-6.4: $(BUILDSTAMPS)
+	$(DOCKEREXEC) 'cd gen/seaqt-6.4 && make -j$$(nproc) test'
+
+test: test-gen-5.15 test-gen-6.4
