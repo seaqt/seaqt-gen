@@ -535,7 +535,11 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		// C++ has given us a QByteArray. CABI needs this as a struct miqt_string
 		// Do not free the data, the caller will free it
 
-		shouldReturn = ifv(p.Const, "const ", "") + "QByteArray " + namePrefix + "_qb = "
+		if p.Pointer {
+			shouldReturn = ifv(p.Const, "const ", "") + "QByteArray& " + namePrefix + "_qb = *"
+		} else {
+			shouldReturn = ifv(p.Const, "const ", "") + "QByteArray " + namePrefix + "_qb = "
+		}
 
 		afterCall += indent + "struct miqt_string " + namePrefix + "_ms;\n"
 		afterCall += indent + namePrefix + "_ms.len = " + namePrefix + "_qb.length();\n"
@@ -863,7 +867,7 @@ func emitBindingHeader(src *CppParsedHeader, filename string, packageName string
 
 	includeGuard := "SEAQT_" + strings.ToUpper(strings.Replace(strings.Replace(packageName, `/`, `_`, -1), `-`, `_`, -1)) + "_GEN_" + strings.ToUpper(strings.Replace(strings.Replace(filename, `.`, `_`, -1), `-`, `_`, -1))
 
-	bindingInclude := "../libseaqt/libseaqt.h"
+	bindingInclude := "../libseaqt-runtime.h"
 
 	if strings.Contains(packageName, `/`) {
 		bindingInclude = "../" + bindingInclude

@@ -33,7 +33,7 @@ genbindings: $(BUILDSTAMPS)
 
 copy-libseaqt: genbindings
 	cd gen/ ;\
-	for a in *seaqt-*; do cp -ar ../libseaqt $$a/seaqt; done ;\
+	for a in *seaqt-*; do cp -ar ../libseaqt/* $$a; done ;\
 	for a in *seaqt-5.15; do cp -ar ../libseaqt-5.15/* $$a; done ;\
 	for a in *seaqt-6.4; do echo $a; cp -ar ../libseaqt-6.4/* $$a; done ;
 

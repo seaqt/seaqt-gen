@@ -56,8 +56,6 @@ struct miqt_map {
   void *values;
 };
 
-typedef const char const_char;
-
 #ifdef __cplusplus
 }
 #endif

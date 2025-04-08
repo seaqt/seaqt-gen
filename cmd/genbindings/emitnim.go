@@ -922,7 +922,7 @@ const privateDir = block:
       break
   flag
 
-{.compile("../libseaqt/libseaqt.cpp", QtCoreCFlags & privateDir).}
+{.compile("../libseaqt-runtime.cpp", QtCoreCFlags & privateDir).}
 
 type QObjectconnectRawSlot* = proc(args: pointer)
 

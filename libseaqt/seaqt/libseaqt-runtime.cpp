@@ -3,8 +3,8 @@
 #include <QMetaObject>
 #include <QObject>
 
-#include "../QtCore/gen_qmetaobject.h"
-#include "../QtCore/gen_qobject.h"
+#include "./QtCore/gen_qmetaobject.h"
+#include "./QtCore/gen_qobject.h"
 
 #include <private/qobject_p.h>
 

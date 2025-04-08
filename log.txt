@@ -27551,15 +27551,7 @@ Blocking method "rhiTexture"([]): Type declaration is too complex to parse
 Blocking method "removedFromAtlas"([Param(QRhiResourceUpdateBatch*? resourceUpdates)]): Type declaration is too complex to parse
 Blocking method "commitTextureOperations"([Param(QRhi* rhi) Param(QRhiResourceUpdateBatch* resourceUpdates)]): Type declaration is too complex to parse
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtQuick/qsgtexture_platform.h"...
-Blocking method "nativeTexture"([]): Type declaration is too complex to parse
-Blocking method "fromNative"([Param(GLuint textureId) Param(QQuickWindow* window) Param(const QSize& size)]): Type declaration is too complex to parse
-Blocking method "fromNativeExternalOES"([Param(GLuint textureId) Param(QQuickWindow* window) Param(const QSize& size)]): Type declaration is too complex to parse
-Blocking method "fromNative4"([Param(GLuint textureId) Param(QQuickWindow* window) Param(const QSize& size) Param(QFlags<QQuickWindow::CreateTextureOption>? options)]): Type declaration is too complex to parse
-Blocking method "fromNativeExternalOES4"([Param(GLuint textureId) Param(QQuickWindow* window) Param(const QSize& size) Param(QFlags<QQuickWindow::CreateTextureOption>? options)]): Type declaration is too complex to parse
-Blocking method "nativeImage"([]): Type declaration is too complex to parse
-Blocking method "nativeImageLayout"([]): Type declaration is too complex to parse
-Blocking method "fromNative"([Param(VkImage image) Param(VkImageLayout layout) Param(QQuickWindow* window) Param(const QSize& size)]): Type declaration is too complex to parse
-Blocking method "fromNative5"([Param(VkImage image) Param(VkImageLayout layout) Param(QQuickWindow* window) Param(const QSize& size) Param(QFlags<QQuickWindow::CreateTextureOption>? options)]): Type declaration is too complex to parse
+Nothing in this header was bindable.
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtQuick/qsgtexturematerial.h"...
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtQuick/qsgtextureprovider.h"...
 Processing "/usr/include/x86_64-linux-gnu/qt6/QtQuick/qsgvertexcolormaterial.h"...
