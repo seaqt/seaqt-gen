@@ -64,7 +64,11 @@ $(OBJS515): %.o: %.cpp
 	@echo Checking $<...
 	@$(CXX) -fsyntax-only $< $(CXXFLAGS515) -I$(COREPRIV515) -I$(COREPRIV515)/QtCore -fPIC
 
+.PHONY: test-gen-5.15 docker-test-gen-5.15
 test-gen-5.15: $(OBJS515)
+
+docker-test-gen-5.15: $(BUILDSTAMPS)
+	$(DOCKEREXEC) 'make -j$(nproc) test-gen-5.15'
 
 # TODO Can we avoid repeating the qt module list?
 COREPRIV64 := $(shell pkg-config --variable=includedir Qt6Core)/QtCore/$(shell pkg-config --modversion Qt6Core)
@@ -80,5 +84,8 @@ $(OBJS64): %.o: %.cpp
 	@$(CXX) -fsyntax-only $< $(CXXFLAGS64) -I$(COREPRIV64) -I$(COREPRIV64)/QtCore -fPIC
 
 test-gen-6.4: $(OBJS64)
+
+docker-test-gen-6.4: $(BUILDSTAMPS)
+	$(DOCKEREXEC) 'make -j$(nproc) test-gen-6.4'
 
 test: test-gen-5.15 test-gen-6.4
