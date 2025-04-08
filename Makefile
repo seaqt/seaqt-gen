@@ -27,7 +27,7 @@ clean:
 	$(DOCKER) image rm -f miqt/genbindings:latest
 	rm -f $(BUILDSTAMPS)
 
-.PHONY: genbindings
+.PHONY: genbindings copy-libseaqt
 genbindings: $(BUILDSTAMPS)
 	$(DOCKEREXEC) 'cd cmd/genbindings && go build && ./genbindings' 2>log.txt
 
