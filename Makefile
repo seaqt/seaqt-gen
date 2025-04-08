@@ -68,7 +68,7 @@ $(OBJS515): %.o: %.cpp
 test-gen-5.15: $(OBJS515)
 
 docker-test-gen-5.15: $(BUILDSTAMPS)
-	$(DOCKEREXEC) 'make -j$(nproc) test-gen-5.15'
+	$(DOCKEREXEC) 'make -j4 test-gen-5.15'
 
 # TODO Can we avoid repeating the qt module list?
 COREPRIV64 := $(shell pkg-config --variable=includedir Qt6Core)/QtCore/$(shell pkg-config --modversion Qt6Core)
@@ -86,6 +86,6 @@ $(OBJS64): %.o: %.cpp
 test-gen-6.4: $(OBJS64)
 
 docker-test-gen-6.4: $(BUILDSTAMPS)
-	$(DOCKEREXEC) 'make -j$(nproc) test-gen-6.4'
+	$(DOCKEREXEC) 'make -j4 test-gen-6.4'
 
 test: test-gen-5.15 test-gen-6.4
