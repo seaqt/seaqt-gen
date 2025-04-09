@@ -13,7 +13,7 @@ DIRS := $(wildcard seaqt/Qt*)
 
 $(DIRS):
 	@echo Checking $@...
-	cd $@ && cat *.cpp | clang++ $(CXXFLAGS) -xc++ -fsyntax-only -
-	cd $@ && clang++ $(CXXFLAGS) -xc++-header -fsyntax-only *.h
+	@cd $@ && cat *.cpp | clang++ $(CXXFLAGS) -xc++ -fsyntax-only -
+	@cd $@ && clang++ $(CXXFLAGS) -xc++-header -fsyntax-only *.h
 
 test: $(DIRS)
