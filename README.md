@@ -1,6 +1,6 @@
 # seaqt-gen
 
-`seaqt-gen` is a `C` binding generator for [Qt](https://www.qt.io/) evolved from the `C` bindings used in [`miqt`](https://github.com/mappu/miqt).
+`seaqt-gen` is a `C` and `Nim` binding generator for [Qt](https://www.qt.io/) evolved from the `C` bindings used in [`miqt`](https://github.com/mappu/miqt).
 
 The bindings are still going through significant changes, including in naming and structure - this repository is a preview intended for feedback.
 
