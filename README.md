@@ -74,3 +74,38 @@ Contributions to `seaqt-gen` are welcome. When contributing, there are a few thi
   * The first commit is used to seed these branches
 
 The above workflow is likely to be [replaced](https://github.com/seaqt/seaqt-gen/issues/3) with something more smooth as the project evolves.
+
+## C translation details
+
+### Inheritance
+
+Inheritance is implemented using a wrapper type (named `VirtualXxx` for `Xxx`)
+which implements each virtual function redirecting the call to a function
+pointer in a `vtable`. The `vtable` is set per instance at construction time.
+
+In addition to the `vtable`, the caller can request additional memory to be
+allocated with each instance simulating the typical memory layout of C++
+inheritance where storage for the derived members simply extend the memory area
+reserved for the base type.
+
+The `vtable` is simply a `struct` containing a pointer for each virtual function,
+including the virtual destructor which automatically gets called when the
+instance is being deleted.
+
+Using `QObject` as example:
+
+```
+| -----------------------------------------------|
+| sizeof(VirtualQObject) + alignment | vdata ... |
+|------------------------------------|-----------|
+| QObject | const QOjbect_VTable*    | ....      |
+|------------------------------------|-----------|
+```
+
+Given a pointer to `QObject`, the `QObject_vdata` function returns a pointer to
+the data section while `vdata_QObject` performs the reverse similar to how
+`static_cast` adjusts pointers to correct for multiple inheritance.
+
+Callers will typically keep a `const` vtable instance for each derived type
+they wish to create, using the vdata part for per-instance data (such as when
+mapping the C++ instance to a host language instance).
