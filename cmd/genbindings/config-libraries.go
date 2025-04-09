@@ -13,7 +13,13 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 		version := "5.15"
 		qtDir := filepath.Join(outDir, "seaqt-"+version)
 		seaqtDir := filepath.Join(qtDir, "seaqt")
+		nimSeaqtDir := filepath.Join(outDir, "nim-seaqt-"+version, "seaqt")
+		nimbleDir := filepath.Join(outDir, "nim-seaqt-"+version)
+
 		os.RemoveAll(seaqtDir)
+		os.RemoveAll(nimSeaqtDir)
+
+		writeNimbleFile(nimbleDir, version)
 
 		// TODO more modules, ideally via command-line support instead of this file
 		// Must be processed in topological dependency order - loosely based on miqt
@@ -37,7 +43,7 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 			generate(
 				"Qt"+lib, "Qt5"+lib,
 				[]string{"/usr/include/x86_64-linux-gnu/qt5/Qt" + lib},
-				clangBin, "", seaqtDir,
+				clangBin, "", seaqtDir, nimSeaqtDir,
 			)
 		}
 	}
@@ -50,7 +56,13 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 		version := "6.4"
 		qtDir := filepath.Join(outDir, "seaqt-"+version)
 		seaqtDir := filepath.Join(qtDir, "seaqt")
+		nimSeaqtDir := filepath.Join(outDir, "nim-seaqt-"+version, "seaqt")
+		nimbleDir := filepath.Join(outDir, "nim-seaqt-"+version)
+
 		os.RemoveAll(seaqtDir)
+		os.RemoveAll(nimSeaqtDir)
+
+		writeNimbleFile(nimbleDir, version)
 
 		libs6 := []string{
 			"Core", "Gui", "Widgets", "Network", "Multimedia", "MultimediaWidgets",
@@ -67,7 +79,7 @@ func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
 			generate(
 				"Qt"+lib, "Qt6"+lib,
 				[]string{"/usr/include/x86_64-linux-gnu/qt6/Qt" + lib},
-				clangBin, "--std=c++17", seaqtDir,
+				clangBin, "--std=c++17", seaqtDir, nimSeaqtDir,
 			)
 		}
 	}

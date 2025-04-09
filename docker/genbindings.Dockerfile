@@ -23,7 +23,11 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
         git \
         ca-certificates \
         pkg-config \
-        build-essential && \
-    apt-get clean
+        build-essential \
+        wget && \
+    apt-get clean && \
+    wget https://github.com/nim-lang/nimble/releases/download/v0.18.2/nimble-linux_x64.tar.gz && \
+    tar xvf nimble-linux_x64.tar.gz && \
+    mv nimble /usr/local/bin
 
 ENV GOFLAGS=-buildvcs=false
