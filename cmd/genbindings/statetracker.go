@@ -1,18 +1,21 @@
 package main
 
 type lookupResultClass struct {
-	PackageName string
-	Class       CppClass
+	QtModuleName string
+	UnitName     string
+	Class        CppClass
 }
 
 type lookupResultTypedef struct {
-	PackageName string
-	Typedef     CppTypedef
+	QtModuleName string
+	UnitName     string
+	Typedef      CppTypedef
 }
 
 type lookupResultEnum struct {
-	PackageName string
-	Enum        CppEnum
+	QtModuleName string
+	UnitName     string
+	Enum         CppEnum
 }
 
 var (
@@ -27,14 +30,14 @@ func flushKnownTypes() {
 	KnownEnums = make(map[string]lookupResultEnum)
 }
 
-func addKnownTypes(packageName string, parsed *CppParsedHeader) {
+func addKnownTypes(qtModuleName string, parsed *CppParsedHeader) {
 	for _, c := range parsed.Classes {
-		KnownClassnames[c.ClassName] = lookupResultClass{packageName, c /* copy */}
+		KnownClassnames[c.ClassName] = lookupResultClass{qtModuleName, genUnitName(parsed.Filename), c /* copy */}
 	}
 	for _, td := range parsed.Typedefs {
-		KnownTypedefs[td.Alias] = lookupResultTypedef{packageName, td /* copy */}
+		KnownTypedefs[td.Alias] = lookupResultTypedef{qtModuleName, genUnitName(parsed.Filename), td /* copy */}
 	}
 	for _, en := range parsed.Enums {
-		KnownEnums[en.EnumName] = lookupResultEnum{packageName, en /* copy */}
+		KnownEnums[en.EnumName] = lookupResultEnum{qtModuleName, genUnitName(parsed.Filename), en /* copy */}
 	}
 }
