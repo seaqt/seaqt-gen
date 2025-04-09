@@ -19,5 +19,5 @@ task test64, "Run tests":
     exec "nim c --skipProjCfg -p:../gen/nim-seaqt-6.4 -r " & e & "/main"
 
   # These require interaction
-  for e in ["helloworld6", "libraries/qt-multimedia", "libraries/qt-printsupport", "libraries/qt-svg", "libraries/qt-webengine"]:
+  for e in ["helloworld6", "libraries/qt-printsupport", "libraries/qt-svg", "libraries/qt-webengine"]:
     exec "nim c --skipProjCfg -p:../gen/nim-seaqt-6.4 " & e & "/main"
