@@ -60,8 +60,11 @@ func pkgConfigCflags(pcName string) string {
 
 	return string(stdout)
 }
+func genUnitName(header string) string {
+	return "gen_" + strings.TrimSuffix(filepath.Base(header), `.h`)
+}
 
-func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir string) {
+func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir, nimOutdir string) {
 
 	var includeFiles []string
 	for _, srcDir := range srcDirs {
@@ -77,6 +80,10 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfigCflags(pcName))...)
 	outDir = filepath.Join(outDir, moduleName)
 	os.MkdirAll(outDir, 0755)
+
+	nimBaseDir := nimOutdir
+	nimOutdir = filepath.Join(nimOutdir, moduleName)
+	os.MkdirAll(nimOutdir, 0755)
 
 	var processHeaders []*CppParsedHeader
 	atr := astTransformRedundant{
@@ -130,6 +137,21 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 		astTransformConstructorOrder(parsed)
 		atr.Process(parsed)
 
+		// Hack to add some overloads
+		if strings.Contains(inputHeader, "qvariant.h") {
+			for i, c := range parsed.Classes {
+				if c.ClassName == "QVariant" {
+					m := CppMethod{
+						MethodName: "fromValue",
+						ReturnType: CppParameter{ParameterType: "QVariant"},
+						Parameters: []CppParameter{CppParameter{ParameterName: "value", ParameterType: "QObject", Const: true, Pointer: true}},
+						IsStatic:   true,
+					}
+					parsed.Classes[i].Methods = append(parsed.Classes[i].Methods, m)
+				}
+			}
+		}
+
 		// Update global state tracker (AFTER astTransformChildClasses)
 		addKnownTypes(moduleName, parsed)
 
@@ -139,6 +161,12 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 	//
 	// PASS 2
 	//
+
+	libsSrc := fmt.Sprintf(`
+const libs = gorge("pkg-config --libs %s")
+{.passl: libs}
+`, pcName)
+	os.WriteFile(filepath.Join(nimOutdir, strings.ReplaceAll(pcName, " ", "_")+"_libs.nim"), []byte(libsSrc), 0644)
 
 	for _, parsed := range processHeaders {
 
@@ -168,7 +196,7 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 		}
 
 		// Emit 3 code files from the intermediate format
-		outputName := filepath.Join(outDir, "gen_"+strings.TrimSuffix(filepath.Base(parsed.Filename), `.h`))
+		outputName := filepath.Join(outDir, genUnitName(parsed.Filename))
 
 		// For packages where we scan multiple directories, it's possible that
 		// there are filename collisions (e.g. Qt 6 has QtWidgets/qaction.h include
@@ -189,12 +217,48 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 			counter++
 		}
 
+		nimSrc, nim64Src, err := emitNim(parsed, filepath.Base(parsed.Filename), moduleName, pcName)
+		if err != nil {
+			log.Printf("Error in %s: %s", parsed.Filename, err)
+			continue
+
+			// panic(err)
+		}
+
+		nimOutputName := filepath.Join(nimOutdir, genUnitName(parsed.Filename))
+
+		err = os.WriteFile(nimOutputName+".nim", []byte(nimSrc), 0644)
+		if err != nil {
+			panic(err)
+		}
+
+		if len(nim64Src) > 0 {
+			err = os.WriteFile(nimOutputName+"_types.nim", []byte(nim64Src), 0644)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		for _, c := range parsed.Classes {
+			if strings.Contains(c.ClassName, "::") {
+				// Inner classes are covered by their main declaration
+				continue
+			}
+
+			os.WriteFile(
+				filepath.Join(nimBaseDir, strings.ToLower(c.ClassName)+".nim"),
+				[]byte("import ./"+moduleName+"/"+genUnitName(parsed.Filename)+"\nexport "+genUnitName(parsed.Filename)), 0644)
+		}
 		bindingCppSrc, err := emitBindingCpp(parsed, filepath.Base(parsed.Filename))
 		if err != nil {
 			panic(err)
 		}
 
 		err = os.WriteFile(outputName+".cpp", []byte(bindingCppSrc), 0644)
+		if err != nil {
+			panic(err)
+		}
+		err = os.WriteFile(nimOutputName+".cpp", []byte(bindingCppSrc), 0644)
 		if err != nil {
 			panic(err)
 		}
@@ -205,6 +269,10 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 		}
 
 		err = os.WriteFile(outputName+".h", []byte(bindingHSrc), 0644)
+		if err != nil {
+			panic(err)
+		}
+		err = os.WriteFile(nimOutputName+".h", []byte(bindingHSrc), 0644)
 		if err != nil {
 			panic(err)
 		}
