@@ -1428,7 +1428,7 @@ type %[1]sVTable* {.inheritable, pure.} = object
 						ret.WriteString(gfs.ind + `var virtualReturn = inst.` + m.nimMethodName() + `(` + strings.Join(paramNames, `, `) + ")\n")
 						virtualRetP := m.ReturnType // copy
 						virtualRetP.ParameterName = "virtualReturn"
-						binding, rvalue := gfs.emitParameterNim2CABIForwarding(virtualRetP, false)
+						binding, rvalue := gfs.emitParameterNim2CABIForwarding(virtualRetP, true)
 						ret.WriteString(binding)
 						ret.WriteString(gfs.ind + rvalue + "\n\n")
 					}
