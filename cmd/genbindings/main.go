@@ -98,7 +98,7 @@ func parseHeaders(includeFiles []string, clangBin string, cflags []string) []*Cp
 	return result
 }
 
-func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir string) {
+func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir, nimOutdir string) {
 
 	var includeFiles []string
 	for _, srcDir := range srcDirs {
@@ -114,6 +114,10 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfig(pcName, "--cflags"))...)
 	outDir = filepath.Join(outDir, qtModuleName)
 	os.MkdirAll(outDir, 0755)
+
+	nimBaseDir := nimOutdir
+	nimOutdir = filepath.Join(nimOutdir, qtModuleName)
+	os.MkdirAll(nimOutdir, 0755)
 
 	atr := astTransformRedundant{
 		preserve: make(map[string]*CppEnum),
@@ -134,6 +138,20 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 		astTransformConstructorOrder(parsed)
 		atr.Process(parsed)
 
+		// Hack to add some overloads
+		if strings.Contains(parsed.Filename, "qvariant.h") {
+			for i, c := range parsed.Classes {
+				if c.ClassName == "QVariant" {
+					m := CppMethod{
+						MethodName: "fromValue",
+						ReturnType: CppParameter{ParameterType: "QVariant"},
+						Parameters: []CppParameter{CppParameter{ParameterName: "value", ParameterType: "QObject", Const: true, Pointer: true}},
+						IsStatic:   true,
+					}
+					parsed.Classes[i].Methods = append(parsed.Classes[i].Methods, m)
+				}
+			}
+		}
 		// Update global state tracker (AFTER astTransformChildClasses)
 		addKnownTypes(qtModuleName, parsed)
 	}
@@ -141,6 +159,10 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 	//
 	// PASS 2
 	//
+	{
+		libsSrc := emitNimPkg(qtModuleName, pcName)
+		os.WriteFile(filepath.Join(nimOutdir, nimModulePkgName(qtModuleName)+".nim"), []byte(libsSrc), 0644)
+	}
 
 	cppFiles := make([]string, 0, len(processHeaders))
 
@@ -173,6 +195,38 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 		// Emit 3 code files from the intermediate format
 		outputName := filepath.Join(outDir, genUnitName(parsed.Filename))
 
+		nimSrc, nim64Src, err := emitNim(parsed, filepath.Base(parsed.Filename), qtModuleName, pcName)
+		if err != nil {
+			log.Printf("Error in %s: %s", parsed.Filename, err)
+			continue
+
+			// panic(err)
+		}
+
+		nimOutputName := filepath.Join(nimOutdir, genUnitName(parsed.Filename))
+
+		err = os.WriteFile(nimOutputName+".nim", []byte(nimSrc), 0644)
+		if err != nil {
+			panic(err)
+		}
+
+		if len(nim64Src) > 0 {
+			err = os.WriteFile(nimOutputName+"_types.nim", []byte(nim64Src), 0644)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		for _, c := range parsed.Classes {
+			if strings.Contains(c.ClassName, "::") {
+				// Inner classes are covered by their main declaration
+				continue
+			}
+
+			os.WriteFile(
+				filepath.Join(nimBaseDir, strings.ToLower(c.ClassName)+".nim"),
+				[]byte("import ./"+qtModuleName+"/"+genUnitName(parsed.Filename)+"\nexport "+genUnitName(parsed.Filename)), 0644)
+		}
 		bindingCppSrc, err := emitBindingCpp(parsed, filepath.Base(parsed.Filename))
 		if err != nil {
 			panic(err)
@@ -184,12 +238,21 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 		}
 		cppFiles = append(cppFiles, genUnitName(parsed.Filename)+".cpp")
 
+		err = os.WriteFile(nimOutputName+".cpp", []byte(bindingCppSrc), 0644)
+		if err != nil {
+			panic(err)
+		}
+
 		bindingHSrc, err := emitBindingHeader(parsed, filepath.Base(parsed.Filename), qtModuleName)
 		if err != nil {
 			panic(err)
 		}
 
 		err = os.WriteFile(outputName+".h", []byte(bindingHSrc), 0644)
+		if err != nil {
+			panic(err)
+		}
+		err = os.WriteFile(nimOutputName+".h", []byte(bindingHSrc), 0644)
 		if err != nil {
 			panic(err)
 		}
