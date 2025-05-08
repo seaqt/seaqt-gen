@@ -1270,7 +1270,7 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 				// Allocate memory for the type and requested user data avoiding variable
 				// name
 				ret.WriteString(
-					"\tvoid* _mem_ = malloc(seaqt_aligned_sizeof<" + derivedName + ">());\n" +
+					"\tvoid* _mem_ = malloc(seaqt_aligned_sizeof<" + derivedName + ">() + vdata);\n" +
 						"\treturn _mem_ ? new (_mem_)" + derivedName + "(" + forwarding + ") : nullptr;\n",
 				)
 			} else {
