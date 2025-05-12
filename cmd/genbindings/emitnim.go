@@ -523,7 +523,18 @@ func (gfs *nimFileState) emitParametersNim2CABIForwarding(m CppMethod, extra str
 
 			preamble += gfs.ind + "# Convert []string to long-lived int& argc, char** argv, never call free()\n"
 			preamble += gfs.ind + "var args2 = @[getAppFilename()]\n"
+			preamble += gfs.ind + "try:\n"
+
+			gfs.indent()
 			preamble += gfs.ind + "args2.add commandLineParams()\n"
+
+			gfs.dedent()
+			preamble += gfs.ind + "except OSError:\n"
+
+			gfs.indent()
+			preamble += gfs.ind + "echo getCurrentExceptionMsg()\n"
+
+			gfs.dedent()
 			preamble += gfs.ind + "var argv: cStringArray = allocCstringArray(args2)\n"
 			preamble += gfs.ind + "var argc {.threadvar.}: cint\n"
 			preamble += gfs.ind + "argc = args2.len.cint\n"
