@@ -46,9 +46,9 @@ reset-gen-nim:
 .PHONY: copy-libseaqt
 copy-libseaqt: | genbindings
 	cd gen/ ;\
-	for a in *seaqt-*; do cp -ar ../libseaqt/* $$a; done ;\
+	for a in *seaqt-*; do cp -aR ../libseaqt/* $$a; done ;\
 	for v in $(VERSIONS); do \
-		for a in *seaqt-$$v; do cp -ar ../libseaqt-$$v/* $$a; done ;\
+		for a in *seaqt-$$v; do cp -aR ../libseaqt-$$v/* $$a; done ;\
 	done
 
 gencommits: genbindings copy-libseaqt
