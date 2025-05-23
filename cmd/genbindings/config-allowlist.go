@@ -54,14 +54,6 @@ func InsertTypedefs(qt6 bool) {
 		KnownTypedefs["QLibraryInfo::LibraryLocation"] = lookupResultTypedef{"qt6", "TODO", CppTypedef{"QLibraryInfo::LibraryLocation", parseSingleTypeString("QLibraryInfo::LibraryPath")}}
 
 		// Enums
-
-		// QSysInfo.h is being truncated and not finding any content
-		KnownEnums["QSysInfo::Endian"] = lookupResultEnum{"qt6", "TODO", CppEnum{
-			EnumName: "QSysInfo::Endian",
-			UnderlyingType: CppParameter{
-				ParameterType: "int",
-			},
-		}}
 	}
 
 }
@@ -209,6 +201,8 @@ func AllowClass(className string) bool {
 		"QSGMaterialRhiShader", // Contains complex return values that need additional fixing
 
 		"QUntypedPropertyData::InheritsQUntypedPropertyData", // qpropertyprivate.h . Hidden/undocumented class in Qt 6.4, removed in 6.7
+
+		"QAtomicInt",
 		"____last____":
 		return false
 	}
