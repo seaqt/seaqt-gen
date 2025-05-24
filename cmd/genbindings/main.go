@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,12 +14,16 @@ import (
 )
 
 const (
-	ClangSubprocessCount = 2
-	BaseModule           = "github.com/mappu/miqt"
+	MaxClangSubprocessCount = 16
+	BaseModule              = "github.com/mappu/miqt"
 )
 
-func cacheFilePath(inputHeader string) string {
-	return filepath.Join("cachedir", strings.Replace(inputHeader, `/`, `__`, -1)+".json")
+func cacheFileRoot(inputHeader string) string {
+	return filepath.Join("cachedir", strings.Replace(inputHeader, `/`, `__`, -1))
+}
+
+func parsedPath(inputHeader string) string {
+	return cacheFileRoot(inputHeader) + ".ours.json"
 }
 
 func findHeadersInDir(srcDir string) []string {
@@ -58,6 +61,40 @@ func pkgConfig(pcName, what string) string {
 	return strings.TrimSpace(string(stdout))
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func parseHeaders(includeFiles []string, clangBin string, cflags []string) []*CppParsedHeader {
+	result := make([]*CppParsedHeader, len(includeFiles))
+
+	// Run clang / parsing in parallel but not too parallel
+	var wg sync.WaitGroup
+	ch := make(chan struct{}, min(runtime.NumCPU(), MaxClangSubprocessCount))
+
+	for i, includeFile := range includeFiles {
+		ch <- struct{}{}
+		wg.Add(1)
+
+		go func(i int, includeFile string) {
+			defer func() {
+				wg.Done()
+				<-ch
+			}()
+
+			result[i] = &CppParsedHeader{Filename: includeFile}
+			ast := getFilteredAst(includeFile, clangBin, cflags)
+			// Convert it to our intermediate format
+			parseHeader(ast, "", result[i])
+		}(i, includeFile)
+	}
+	wg.Wait()
+	return result
+}
+
 func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir string) {
 
 	var includeFiles []string
@@ -75,51 +112,17 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 	outDir = filepath.Join(outDir, moduleName)
 	os.MkdirAll(outDir, 0755)
 
-	var processHeaders []*CppParsedHeader
 	atr := astTransformRedundant{
 		preserve: make(map[string]*CppEnum),
 	}
 
 	//
-	// PASS 0 (Fill clang cache)
+	// PASS 1 (Parse headers and generate IL)
 	//
 
-	generateClangCaches(includeFiles, clangBin, cflags)
+	processHeaders := parseHeaders(includeFiles, clangBin, cflags)
 
-	// The cache should now be fully populated.
-
-	//
-	// PASS 1 (clang2il)
-	//
-
-	for _, inputHeader := range includeFiles {
-
-		cacheFile := cacheFilePath(inputHeader)
-
-		astJson, err := os.ReadFile(cacheFile)
-		if err != nil {
-			panic("Expected cache to be created for " + inputHeader + ", but got error " + err.Error())
-		}
-
-		// Json decode
-		var astInner []interface{} = nil
-		err = json.Unmarshal(astJson, &astInner)
-		if err != nil {
-			panic(err)
-		}
-
-		if astInner == nil {
-			panic("Null in cache file for " + inputHeader)
-		}
-
-		// Convert it to our intermediate format
-		parsed, err := parseHeader(astInner, "")
-		if err != nil {
-			panic(err)
-		}
-
-		parsed.Filename = inputHeader // Stash
-
+	for _, parsed := range processHeaders {
 		// AST transforms on our IL
 		astTransformChildClasses(parsed)        // must be first
 		astTransformApplyQuirks(pcName, parsed) // must be before optional/overload expansion
@@ -130,8 +133,6 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 
 		// Update global state tracker (AFTER astTransformChildClasses)
 		addKnownTypes(moduleName, parsed)
-
-		processHeaders = append(processHeaders, parsed)
 	}
 
 	//
@@ -148,15 +149,14 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 
 		{
 			// Save the IL file for debug inspection
-			jb, err := json.MarshalIndent(parsed, "", "\t")
+			file, err := os.Create(parsedPath(parsed.Filename))
 			if err != nil {
 				panic(err)
 			}
-
-			err = os.WriteFile(cacheFilePath(parsed.Filename)+".ours.json", jb, 0644)
-			if err != nil {
-				panic(err)
-			}
+			defer file.Close()
+			enc := json.NewEncoder(file)
+			enc.SetIndent("", "\t")
+			enc.Encode(parsed)
 		}
 
 		// Breakout if there is nothing bindable
@@ -212,68 +212,6 @@ func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtra
 	}
 
 	log.Printf("Processing %d file(s) completed", len(includeFiles))
-}
-
-func generateClangCaches(includeFiles []string, clangBin string, cflags []string) {
-
-	var clangChan = make(chan string)
-	var clangWg sync.WaitGroup
-	ctx := context.Background()
-
-	for i := 0; i < ClangSubprocessCount; i++ {
-		clangWg.Add(1)
-		go func() {
-			defer clangWg.Done()
-			log.Printf("Clang worker: starting")
-
-			for {
-				inputHeader, ok := <-clangChan
-				if !ok {
-					return // Done
-				}
-
-				log.Printf("Clang worker got message for file %q", inputHeader)
-
-				// Parse the file
-				// This seems to intermittently fail, so allow retrying
-				astInner := mustClangExec(ctx, clangBin, inputHeader, cflags)
-
-				// Write to cache
-				jb, err := json.MarshalIndent(astInner, "", "\t")
-				if err != nil {
-					panic(err)
-				}
-
-				err = os.WriteFile(cacheFilePath(inputHeader), jb, 0644)
-				if err != nil {
-					panic(err)
-				}
-
-				astInner = nil
-				jb = nil
-				runtime.GC()
-
-			}
-			log.Printf("Clang worker: exiting")
-		}()
-	}
-
-	for _, inputHeader := range includeFiles {
-
-		// Check if there is a matching cache hit
-		cacheFile := cacheFilePath(inputHeader)
-
-		if _, err := os.Stat(cacheFile); err != nil && os.IsNotExist(err) {
-
-			// Nonexistent cache file, regenerate from clang
-			log.Printf("No AST cache for file %q, running clang...", filepath.Base(inputHeader))
-			clangChan <- inputHeader
-		}
-	}
-
-	// Done with all clang workers
-	close(clangChan)
-	clangWg.Wait()
 }
 
 func main() {
