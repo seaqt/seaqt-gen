@@ -1114,6 +1114,9 @@ proc deleteLater*(self: sink ` + nimClassName + `) =
 		nameTest := map[string]string{}
 	nextEnum:
 		for _, e := range src.Enums {
+			if e.EnumName == "" {
+				continue // Removed by transformRedundant AST pass or empty
+			}
 
 			shortEnumName := e.ShortEnumName()
 
@@ -1141,7 +1144,7 @@ proc deleteLater*(self: sink ` + nimClassName + `) =
 
 	for _, e := range src.Enums {
 		if e.EnumName == "" {
-			continue // Removed by transformRedundant AST pass
+			continue // Removed by transformRedundant AST pass or empty
 		}
 
 		// "::" at the end means an anonymous nested enum
