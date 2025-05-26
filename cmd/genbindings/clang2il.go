@@ -27,6 +27,20 @@ func (node *AstNode) file() string {
 	return ""
 }
 
+func (node *AstNode) isImplicit() bool {
+	isImplicit, ok := node.Fields["isImplicit"].(bool)
+	return ok && isImplicit
+}
+
+func (node *AstNode) qualType(frame string) string {
+	// return qualified type or empty
+	if outer, ok := node.Fields[frame].(map[string]interface{}); ok {
+		qualType, _ := outer["qualType"].(string)
+		return qualType // empty if !ok
+	}
+	return ""
+}
+
 // parseHeader parses a whole C++ header into our CppParsedHeader intermediate format.
 func parseHeader(node *AstNode, addNamePrefix string, output *CppParsedHeader) {
 	kind := node.Kind
@@ -131,8 +145,13 @@ const (
 
 // processClassType parses a single C++ class definition into our intermediate format.
 func processClassType(node *AstNode, addNamePrefix string) (CppClass, error) {
-	var ret CppClass
-	ret.CanDelete = true
+	var ret = CppClass{
+		HasCopyCtor:   true,
+		HasCopyAssign: true,
+		HasMoveCtor:   true,
+		HasMoveAssign: true,
+		CanDelete:     true,
+	}
 
 	// Must have a name
 	nodename, ok := node.Fields["name"].(string)
@@ -291,17 +310,24 @@ nextMethod:
 			}
 
 		case "CXXConstructorDecl":
+			copy, move := isCopyMoveConstructor(node, ret.ClassName)
+			skip := !(visibility == VsPublic || node.isImplicit()) || isExplicitlyDeleted(node)
+			log.Print(copy, move, skip, ret.ClassName, node)
 
-			if isImplicit, ok := node.Fields["isImplicit"].(bool); ok && isImplicit {
-				// This is an implicit ctor. Therefore the class is constructable
-				// even if we're currently in a `private:` block.
+			if copy || move || skip {
+				// Skip adding an explicit entry - these will be generated separately
+				if skip {
+					if copy {
+						ret.HasCopyCtor = false
+					} else {
+						ret.HasMoveCtor = false
+					}
+				}
 
-			} else if visibility != VsPublic {
-				continue // Skip private/protected
+				continue
 			}
 
-			// Check if this is `= delete`
-			if isExplicitlyDeleted(node) {
+			if skip {
 				continue
 			}
 
@@ -361,12 +387,23 @@ nextMethod:
 				return CppClass{}, errors.New("method has no name")
 			}
 
-			if isImplicit, ok := node.Fields["isImplicit"].(bool); ok && isImplicit {
-				// implicit is implicitly public!
-			} else if visibility == VsPrivate {
-				// If this is a virtual method, we want to allow overriding it even
-				// if it is protected
-				// But we can only call it if it is public
+			copy, move := isCopyMoveAssignment(node, ret.ClassName, methodName)
+
+			if copy || move {
+				if !(visibility == VsPublic || node.isImplicit()) || isExplicitlyDeleted(node) {
+					if copy {
+						ret.HasCopyAssign = false
+					} else {
+						ret.HasMoveAssign = false
+					}
+				}
+				continue
+			}
+
+			// If this is a virtual method, we want to allow overriding it even
+			// if it is protected
+			// But we can only call it if it is public
+			if visibility == VsPrivate {
 				ret.PrivateMethods = append(ret.PrivateMethods, methodName)
 				continue // Skip private, ALLOW protected
 			}
@@ -452,6 +489,32 @@ nextMethod:
 	}
 
 	return ret, nil // done
+}
+
+func isCopyMoveConstructor(node *AstNode, className string) (bool, bool) {
+	if len(node.Inner) != 1 {
+		return false, false
+	}
+
+	qualType := strings.ReplaceAll(node.Inner[0].qualType("type"), "const ", "")
+	sameClass := qualType == className || strings.Contains(qualType, className+" ")
+	rref := strings.Contains(qualType, "&&")
+
+	return sameClass && !rref, sameClass && rref
+}
+
+func isCopyMoveAssignment(node *AstNode, className, methodName string) (bool, bool) {
+	if len(node.Inner) != 1 || methodName != "operator=" {
+		return false, false
+	}
+
+	// Approximation given that there are many ways to write a copy assignment
+	// https://en.cppreference.com/w/cpp/language/as_operator.html
+	qualType := strings.ReplaceAll(node.Inner[0].qualType("type"), "const ", "")
+	sameClass := qualType == className || strings.Contains(qualType, className+" ")
+	rref := strings.Contains(qualType, "&&")
+
+	return sameClass && !rref, sameClass && rref
 }
 
 // isExplicitlyDeleted checks if this node is marked `= delete`.

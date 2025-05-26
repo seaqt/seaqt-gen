@@ -57,6 +57,10 @@ func astTransformConstructorOrder(parsed *CppParsedHeader) {
 			return false
 		})
 
+		if c.HasCopyCtor {
+			params := []CppParameter{CppParameter{ParameterName: "other", ParameterType: c.ClassName, Const: true, ByRef: true}}
+			c.Ctors = append(c.Ctors, CppMethod{Parameters: params, ReturnType: CppParameter{ParameterType: c.ClassName}})
+		}
 		// Persist mutation
 		parsed.Classes[i] = c
 

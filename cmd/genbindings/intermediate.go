@@ -408,7 +408,14 @@ type CppClass struct {
 	DirectInherits []string    // other class names. This only includes direct inheritance - use AllInherits() to find recursive inheritance
 	Methods        []CppMethod
 	Props          []CppProperty
-	CanDelete      bool
+
+	// "big 5" - copy/move construct/assign + destroy - false when private / deleted
+	HasCopyCtor   bool
+	HasCopyAssign bool
+	HasMoveCtor   bool
+	HasMoveAssign bool
+
+	CanDelete bool
 
 	ChildTypedefs  []CppTypedef
 	ChildClassdefs []CppClass
