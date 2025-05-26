@@ -361,10 +361,12 @@ nextMethod:
 				return CppClass{}, errors.New("method has no name")
 			}
 
-			// If this is a virtual method, we want to allow overriding it even
-			// if it is protected
-			// But we can only call it if it is public
-			if visibility == VsPrivate {
+			if isImplicit, ok := node.Fields["isImplicit"].(bool); ok && isImplicit {
+				// implicit is implicitly public!
+			} else if visibility == VsPrivate {
+				// If this is a virtual method, we want to allow overriding it even
+				// if it is protected
+				// But we can only call it if it is public
 				ret.PrivateMethods = append(ret.PrivateMethods, methodName)
 				continue // Skip private, ALLOW protected
 			}
