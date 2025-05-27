@@ -34,8 +34,8 @@ func (p CppParameter) cParameterName() string {
 	return parmName
 }
 
-func cabiNewName(c CppClass, i int) string {
-	return cabiClassName(c.ClassName) + `_new` + maybeSuffix(i)
+func cabiNewName(c CppClass, ctor CppMethod) string {
+	return cabiClassName(c.ClassName) + `_new` + ctor.MethodName
 }
 
 func cabiDeleteName(c CppClass) string {
@@ -960,8 +960,8 @@ extern "C" {
 			ret.WriteString("\n")
 		}
 
-		for i, ctor := range c.Ctors {
-			ret.WriteString(fmt.Sprintf("%s* %s(%s);\n", derivedName, cabiNewName(c, i), emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0)))
+		for _, ctor := range c.Ctors {
+			ret.WriteString(fmt.Sprintf("%s* %s(%s);\n", derivedName, cabiNewName(c, ctor), emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0)))
 		}
 		if len(c.Ctors) > 0 {
 			ret.WriteString("\n")
@@ -1270,12 +1270,12 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 
 		derivedName := ifv(len(virtualMethods) > 0, cppSubclassName(c), cabiClassName(c.ClassName))
 
-		for i, ctor := range c.Ctors {
+		for _, ctor := range c.Ctors {
 
 			preamble, forwarding := emitParametersCABI2CppForwarding(ctor.Parameters, "\t", len(virtualMethods) > 0)
 
 			ret.WriteString(
-				derivedName + "* " + cabiNewName(c, i) + "(" + emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0) + ") {\n",
+				derivedName + "* " + cabiNewName(c, ctor) + "(" + emitParametersCabiConstructor(&c, &ctor, len(virtualMethods) > 0) + ") {\n",
 			)
 
 			if ctor.RequireCpp != nil {
