@@ -122,3 +122,34 @@ the data section while `vdata_QObject` performs the reverse similar to how
 Callers will typically keep a `const` vtable instance for each derived type
 they wish to create, using the vdata part for per-instance data (such as when
 mapping the C++ instance to a host language instance).
+
+### Overloading
+
+Similar to how the C++ generates mangled symbol names for overloaded
+methods / functions, a name mangling scheme is used to generate C-compatible
+names for overloads.
+
+Generating names is a tradeoff between symbol stability across versions,
+aesthetics and correctness, thus we use several strategies ranging from
+nice-to-ugly:
+
+* If there are no overloads, keep names as is
+* Try a mangling scheme based on parameter names - since these formally are not
+  part of the overload rules of C++, we might still end up with conflicts - this
+  scheme however tends to convey the meaning of the overload well, ie
+  `QUrl_new_url` for the overload that takes a parameter named `url`.
+* Try a type-based mangling scheme without considering the cv-qualification of
+  `this` - this is "almost" correct but fails when const/non-const overloads
+  exist for the method - `QVariant_new_cQPoint` would be an example, due to
+  `QVariant` using the same parameter name for multiple overloads.
+* Finally, use cv-qualification of `this` to add the final touch that should
+  render the name fully unique - `QVariant_data_const` exemplifies this due to
+  there being both a `QVariant::data()` and `QVariant::data() const`
+
+The strategy is chosen per name, meaning that all overloads of the same name use
+the same strategy.
+
+While this method leads to fairly meaningful names for the majority of
+functions, it comes at a stability cost: since we don't keep track of
+"past versions" of the same file, a new overload can cause the naming strategy
+change thus renaming existing symbols as well.

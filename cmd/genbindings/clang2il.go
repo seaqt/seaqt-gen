@@ -316,7 +316,7 @@ nextMethod:
 			}
 
 			var mm CppMethod
-			err := parseMethod(node, &mm)
+			err := parseMethod(node, &mm, ret.ClassName)
 			if err != nil {
 				if errors.Is(err, ErrTooComplex) {
 					log.Printf("Skipping ctor with complex type")
@@ -391,7 +391,7 @@ nextMethod:
 			var mm CppMethod
 			mm.MethodName = methodName
 
-			err := parseMethod(node, &mm)
+			err := parseMethod(node, &mm, ret.ClassName)
 			if err != nil {
 				if errors.Is(err, ErrTooComplex) {
 					log.Printf("Skipping method %q with complex type", mm.MethodName)
@@ -684,7 +684,7 @@ nextEnumEntry:
 }
 
 // parseMethod parses a Clang method into our CppMethod intermediate format.
-func parseMethod(node *AstNode, mm *CppMethod) error {
+func parseMethod(node *AstNode, mm *CppMethod, className string) error {
 
 	if typobj, ok := node.Fields["type"].(map[string]interface{}); ok {
 		if qualType, ok := typobj["qualType"].(string); ok {
@@ -718,13 +718,16 @@ func parseMethod(node *AstNode, mm *CppMethod) error {
 			case "ParmVarDecl":
 				// Parameter variable
 				parmName, _ := methodObj.Fields["name"].(string) // n.b. may be unnamed
-				if parmName == "" {
+				if isCopyConstructor(node, className) || isCopyAssignmentOperator(node, className) {
+					// Hack to make the overload mangler give copy constructors a predictable name
+					// TODO doesn't work for types with only copy-constr, and it's a lousy name anyway
+					parmName = "from"
+				} else if parmName == "" {
 
-					// Generate a default parameter name
+					// Generate a default parameter namecopy
 					// Super nice autogen names if this is a Q_PROPERTY setter:
 					if len(mm.Parameters) == 1 && strings.HasPrefix(mm.MethodName, "set") {
 						parmName = strings.ToLower(string(mm.MethodName[3])) + mm.MethodName[4:]
-
 					} else {
 						// Otherwise - default
 						parmName = fmt.Sprintf("param%d", paramCounter+1)
@@ -1009,4 +1012,56 @@ func parseSingleTypeString(p string) CppParameter {
 	insert.ParameterType = strings.TrimPrefix(insert.ParameterType, "::")
 
 	return insert
+}
+
+func isCopyConstructor(node *AstNode, className string) bool {
+	if node.Kind != "CXXConstructorDecl" {
+		return false
+	}
+	// Must have exactly one parameter
+	if len(node.Inner) != 1 {
+		return false
+	}
+	param := node.Inner[0]
+	if param.Kind != "ParmVarDecl" {
+		return false
+	}
+	typ, ok := param.Fields["type"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	qualType, ok := typ["qualType"].(string)
+	if !ok {
+		return false
+	}
+	// The parameter type should be "const <ClassName>&" or similar
+	return qualType == "const "+className+" &" || qualType == className+" &"
+}
+
+func isCopyAssignmentOperator(node *AstNode, className string) bool {
+	if node.Kind != "CXXMethodDecl" {
+		return false
+	}
+	name, ok := node.Fields["name"].(string)
+	if !ok || name != "operator=" {
+		return false
+	}
+	// Must have exactly one parameter
+	if len(node.Inner) != 1 {
+		return false
+	}
+	param := node.Inner[0]
+	if param.Kind != "ParmVarDecl" {
+		return false
+	}
+	typ, ok := param.Fields["type"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	qualType, ok := typ["qualType"].(string)
+	if !ok {
+		return false
+	}
+	// The parameter type should be "const <ClassName> &" or "<ClassName>"
+	return qualType == "const "+className+" &" || qualType == className
 }
