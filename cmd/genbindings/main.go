@@ -27,7 +27,7 @@ func importPathForQtPackage(packageName string) string {
 	return BaseModule + "/" + packageName
 }
 
-func findHeadersInDir(srcDir string, allowHeader func(string) bool) []string {
+func findHeadersInDir(srcDir string) []string {
 	content, err := os.ReadDir(srcDir)
 	if err != nil {
 		panic(err)
@@ -43,7 +43,7 @@ func findHeadersInDir(srcDir string, allowHeader func(string) bool) []string {
 			continue
 		}
 		fullPath := filepath.Join(srcDir, includeFile.Name())
-		if !allowHeader(fullPath) {
+		if !AllowHeader(fullPath) {
 			continue
 		}
 		ret = append(ret, fullPath)
@@ -52,65 +52,32 @@ func findHeadersInDir(srcDir string, allowHeader func(string) bool) []string {
 	return ret
 }
 
-func cleanGeneratedFilesInDir(dirpath string) {
-	log.Printf("Cleaning up output directory %q...", dirpath)
-
-	_ = os.MkdirAll(dirpath, 0755)
-
-	existing, err := os.ReadDir(dirpath)
+func pkgConfigCflags(pcName string) string {
+	stdout, err := exec.Command(`pkg-config`, `--cflags`, pcName).Output()
 	if err != nil {
-		panic(err)
-	}
-
-	cleaned := 0
-	for _, e := range existing {
-		if e.IsDir() {
-			continue
-		}
-		if !strings.HasPrefix(e.Name(), `gen_`) {
-			continue
-		}
-		// One of ours, clean up
-		err := os.Remove(filepath.Join(dirpath, e.Name()))
-		if err != nil {
-			log.Printf("WARNING: Failed to remove existing file %q", e.Name())
-			continue
-		}
-
-		cleaned++
-	}
-
-	log.Printf("Removed %d file(s).", cleaned)
-}
-
-func pkgConfigCflags(packageName string) string {
-	stdout, err := exec.Command(`pkg-config`, `--cflags`, packageName).Output()
-	if err != nil {
-		log.Printf("pkg-config(%q): %v", packageName, string(err.(*exec.ExitError).Stderr))
+		log.Printf("pkg-config(%q): %v", pcName, string(err.(*exec.ExitError).Stderr))
 		panic(err)
 	}
 
 	return string(stdout)
 }
 
-func generate(packageName string, srcDirs []string, allowHeaderFn func(string) bool, clangBin, cflagsCombined, outDir string, matcher ClangMatcher) {
+func generate(moduleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir string) {
 
 	var includeFiles []string
 	for _, srcDir := range srcDirs {
 		if strings.HasSuffix(srcDir, `.h`) {
 			includeFiles = append(includeFiles, srcDir) // single .h
 		} else {
-			includeFiles = append(includeFiles, findHeadersInDir(srcDir, allowHeaderFn)...)
+			includeFiles = append(includeFiles, findHeadersInDir(srcDir)...)
 		}
 	}
 
 	log.Printf("Found %d header files to process.", len(includeFiles))
 
-	cflags := strings.Fields(cflagsCombined)
-
-	outDir = filepath.Join(outDir, packageName)
-
-	cleanGeneratedFilesInDir(outDir)
+	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfigCflags(pcName))...)
+	outDir = filepath.Join(outDir, moduleName)
+	os.MkdirAll(outDir, 0755)
 
 	var processHeaders []*CppParsedHeader
 	atr := astTransformRedundant{
@@ -121,7 +88,7 @@ func generate(packageName string, srcDirs []string, allowHeaderFn func(string) b
 	// PASS 0 (Fill clang cache)
 	//
 
-	generateClangCaches(includeFiles, clangBin, cflags, matcher)
+	generateClangCaches(includeFiles, clangBin, cflags)
 
 	// The cache should now be fully populated.
 
@@ -158,15 +125,15 @@ func generate(packageName string, srcDirs []string, allowHeaderFn func(string) b
 		parsed.Filename = inputHeader // Stash
 
 		// AST transforms on our IL
-		astTransformChildClasses(parsed)             // must be first
-		astTransformApplyQuirks(packageName, parsed) // must be before optional/overload expansion
+		astTransformChildClasses(parsed)        // must be first
+		astTransformApplyQuirks(pcName, parsed) // must be before optional/overload expansion
 		astTransformOptional(parsed)
 		astTransformOverloads(parsed)
 		astTransformConstructorOrder(parsed)
 		atr.Process(parsed)
 
 		// Update global state tracker (AFTER astTransformChildClasses)
-		addKnownTypes(packageName, parsed)
+		addKnownTypes(moduleName, parsed)
 
 		processHeaders = append(processHeaders, parsed)
 	}
@@ -234,7 +201,7 @@ func generate(packageName string, srcDirs []string, allowHeaderFn func(string) b
 			panic(err)
 		}
 
-		bindingHSrc, err := emitBindingHeader(parsed, filepath.Base(parsed.Filename), packageName)
+		bindingHSrc, err := emitBindingHeader(parsed, filepath.Base(parsed.Filename), moduleName)
 		if err != nil {
 			panic(err)
 		}
@@ -251,7 +218,7 @@ func generate(packageName string, srcDirs []string, allowHeaderFn func(string) b
 	log.Printf("Processing %d file(s) completed", len(includeFiles))
 }
 
-func generateClangCaches(includeFiles []string, clangBin string, cflags []string, matcher ClangMatcher) {
+func generateClangCaches(includeFiles []string, clangBin string, cflags []string) {
 
 	var clangChan = make(chan string)
 	var clangWg sync.WaitGroup
@@ -273,7 +240,7 @@ func generateClangCaches(includeFiles []string, clangBin string, cflags []string
 
 				// Parse the file
 				// This seems to intermittently fail, so allow retrying
-				astInner := mustClangExec(ctx, clangBin, inputHeader, cflags, matcher)
+				astInner := mustClangExec(ctx, clangBin, inputHeader, cflags)
 
 				// Write to cache
 				jb, err := json.MarshalIndent(astInner, "", "\t")
@@ -317,7 +284,7 @@ func main() {
 	// data/time flags make logs hard to compare across runs
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	clang := flag.String("clang", "clang", "Custom path to clang")
-	outDir := flag.String("outdir", "../../", "Output directory for generated gen_** files")
+	outDir := flag.String("outdir", "../../gen", "Output directory for generated gen_** files")
 	extraLibsDir := flag.String("extralibs", "/usr/local/src/", "Base directory to find extra library checkouts")
 
 	flag.Parse()
