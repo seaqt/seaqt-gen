@@ -228,6 +228,11 @@ func AllowClass(className string) bool {
 
 		"QDesignerFormEditorInterface", // https://github.com/mappu/miqt/issues/302
 
+		"QNativeInterface::QSGOpenGLTexture", // Abstract class, cannot be instantiated (?)
+		"QNativeInterface::QSGVulkanTexture", // ..
+
+		"QSGMaterialRhiShader", // Contains complex return values that need additional fixing
+
 		"____last____":
 		return false
 	}
@@ -399,7 +404,16 @@ func AllowMethod(className string, mm CppMethod) error {
 		if className == "QActionEvent" && p.ParameterType == "QAction" {
 			return ErrTooComplex // circular dep
 		}
+
+		if className == "QQuickWebEngineProfile" && p.ParameterType == "QQuickWebEngineDownloadRequest" {
+			// TODO  Note: To use from C++ static_cast download to QWebEngineDownloadRequest
+			return ErrTooComplex // circular dep
+		}
 	}
+	if className == "QQuickWebEngineProfile" && mm.ReturnType.ParameterType == "QQuickWebEngineScriptCollection" {
+		return ErrTooComplex // circular dep
+	}
+
 	if className == "QWebElement" && mm.ReturnType.ParameterType == "QWebFrame" {
 		return ErrTooComplex // circular dep
 	}
@@ -603,6 +617,9 @@ func AllowType(p CppParameter, isReturnType bool) error {
 	if strings.Contains(p.ParameterType, "QStack<") {
 		return ErrTooComplex // Qt 5 Qwt QwtPlotZoomer::zoomStack()
 	}
+	if strings.HasPrefix(p.ParameterType, "QSharedPointer<") {
+		return ErrTooComplex
+	}
 
 	if strings.HasPrefix(p.ParameterType, "std::") {
 		// std::initializer           e.g. qcborarray.h
@@ -757,6 +774,21 @@ func AllowType(p CppParameter, isReturnType bool) error {
 
 		"QDesignerFormEditorInterface", // https://github.com/mappu/miqt/issues/302
 
+		"QV4::ExecutionEngine",      // QtQuick stuff onwards
+		"QOpenGLFramebufferObject",  // ..
+		"QQuickCloseEvent",          // ..
+		"QOpenGLShaderProgram",      // ..
+		"QRhiResourceUpdateBatch",   // ..
+		"QRhiRenderTarget",          // ..
+		"QQmlV4Function",            // ..
+		"QOpenGLShader::ShaderType", // ..
+		"QShader",                   // ..
+		"QByteArrayList",
+		"QRhiTexture", // Private type?
+		"VkDevice",
+		"VkImage",
+		"VkImageLayout",
+		"VkPhysicalDevice",
 		"____last____":
 		return ErrTooComplex
 	}
