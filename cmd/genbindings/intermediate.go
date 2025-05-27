@@ -365,7 +365,7 @@ func (nm CppMethod) SafeMethodName() string {
 	// Also replace any underscore_case with CamelCase
 	// Only catch lowercase letters in this one, not uppercase, as it causes a
 	// lot of churn for Scintilla
-	tmp = regexp.MustCompile(`_([a-z])`).ReplaceAllStringFunc(tmp, func(match string) string { return strings.ToUpper(match[1:]) })
+	// tmp = regexp.MustCompile(`_([a-z])`).ReplaceAllStringFunc(tmp, func(match string) string { return strings.ToUpper(match[1:]) })
 
 	return tmp
 }

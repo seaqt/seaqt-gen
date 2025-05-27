@@ -1484,7 +1484,7 @@ type %[1]sVTable* {.inheritable, pure.} = object
 				preamble, forwarding := gfs.emitParametersNim2CABIForwarding(ctor, ifv(len(virtualMethods) > 0, "addr(vtbl[].vtbl), csize_t(sizeof(pointer))", ""))
 				cabiParams := gfs.emitParametersNim(ctor.Parameters, true, ifv(len(virtualMethods) > 0, "vtbl: pointer, vdata: csize_t", ""))
 				fmt.Fprintf(&cabi, `proc %[1]s(%[2]s): ptr %[3]s {.importc: "%[4]s".}
-`, ncabiNewName(c, i), cabiParams, rawClassName, cabiNewName(c, i))
+`, ncabiNewName(c, i), cabiParams, rawClassName, cabiNewName(c, ctor))
 
 				nimParams := gfs.emitParametersNim(ctor.Parameters, false, "")
 				paramsX := ""

@@ -37,10 +37,10 @@ void onPressed(intptr_t data) {
 }
 
 int main(int argc, char **argv) {
-  QApplication_new(&a_vtbl, 0, &argc, argv);
+  QApplication_new_int_char(&a_vtbl, 0, &argc, argv);
 
-  struct HelloWorld env = {
-      .button = QPushButton_new3(&pb_vtbl, 0, seaqt_literal("Hello world!"))};
+  struct HelloWorld env = {.button = QPushButton_new_text(
+                               &pb_vtbl, 0, seaqt_literal("Hello world!"))};
 
   QWidget_setFixedWidth((QWidget *)env.button, 320);
 
