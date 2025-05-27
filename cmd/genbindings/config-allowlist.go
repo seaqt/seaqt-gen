@@ -202,6 +202,11 @@ func AllowClass(className string) bool {
 		"QQmlV4Function",             // Qt 6. Not part of the interface
 		"QWebEngineQuotaRequest",     // Qt 6 QWebEngine: Deprecated in Qt 6.9
 
+		"QNativeInterface::QSGOpenGLTexture", // Abstract class, cannot be instantiated (?)
+		"QNativeInterface::QSGVulkanTexture", // ..
+
+		"QSGMaterialRhiShader", // Contains complex return values that need additional fixing
+
 		"QUntypedPropertyData::InheritsQUntypedPropertyData", // qpropertyprivate.h . Hidden/undocumented class in Qt 6.4, removed in 6.7
 		"____last____":
 		return false
@@ -318,9 +323,16 @@ func AllowMethod(className string, mm CppMethod) error {
 		if className == "QSignalMapper" && p.ParameterType == "QWidget" {
 			return ErrTooComplex // circular dep
 		}
+		if className == "QQuickWebEngineProfile" && p.ParameterType == "QQuickWebEngineDownloadRequest" {
+			// TODO  Note: To use from C++ static_cast download to QWebEngineDownloadRequest
+			return ErrTooComplex // circular dep
+		}
 		if className == "QActionEvent" && p.ParameterType == "QAction" {
 			return ErrTooComplex // circular dep
 		}
+	}
+	if className == "QQuickWebEngineProfile" && mm.ReturnType.ParameterType == "QQuickWebEngineScriptCollection" {
+		return ErrTooComplex // circular dep
 	}
 	if className == "QWebElement" && mm.ReturnType.ParameterType == "QWebFrame" {
 		return ErrTooComplex // circular dep
@@ -517,6 +529,9 @@ func AllowType(p CppParameter, isReturnType bool) error {
 	if strings.HasPrefix(p.ParameterType, "QWebEngineCallback<") {
 		return ErrTooComplex // Function pointer types in QtWebEngine
 	}
+	if strings.HasPrefix(p.ParameterType, "QSharedPointer<") {
+		return ErrTooComplex
+	}
 
 	if strings.HasPrefix(p.ParameterType, "std::") {
 		// std::initializer           e.g. qcborarray.h
@@ -642,6 +657,23 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"QWebFrameAdapter",                // Qt 5 Webkit: Used by e.g. qwebframe.h but never defined anywhere
 		"QWebPageAdapter",                 // ...
 		"QQmlWebChannelAttached",          // Qt 5 qqmlwebchannel.h. Need to add QML support for this to work
+		"QV4::ExecutionEngine",            // QtQuick stuff onwards
+		"QOpenGLFramebufferObject",        // ..
+		"QOpenGLContext",                  // ..
+		"QQuickCloseEvent",                // ..
+		"QOpenGLShaderProgram",            // ..
+		"QRhiResourceUpdateBatch",         // ..
+		"QRhiRenderTarget",                // ..
+		"QQmlV4Function",                  // ..
+		"QOpenGLShader::ShaderType",       // ..
+		"QShader",                         // ..
+		"QByteArrayList",
+		"QRhiTexture", // Private type?
+		"GLuint",
+		"VkDevice",
+		"VkImage",
+		"VkImageLayout",
+		"VkPhysicalDevice",
 		"____last____":
 		return ErrTooComplex
 	}
