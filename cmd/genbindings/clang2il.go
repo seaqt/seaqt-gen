@@ -8,23 +8,6 @@ import (
 	"strings"
 )
 
-type HeaderMatcher func(astNodeFilename, curFilename string) bool
-
-func ClangMatchSameHeaderDefinitionOnly(astNodeFilename, curFilename string) bool {
-	return astNodeFilename == curFilename
-}
-
-type clangMatchUnderPath struct {
-	basePath string
-}
-
-func (c *clangMatchUnderPath) Match(astNodeFilename, curFilename string) bool {
-	if astNodeFilename == curFilename {
-		return true
-	}
-	return strings.HasPrefix(astNodeFilename, c.basePath)
-}
-
 var (
 	ErrTooComplex          = errors.New("Type declaration is too complex to parse")
 	ErrForwardIncompatible = fmt.Errorf("Breaks compatibility with newer versions: %w", ErrTooComplex)
@@ -46,15 +29,15 @@ func (node *AstNode) file() string {
 }
 
 // parseHeader parses a whole C++ header into our CppParsedHeader intermediate format.
-func parseHeader(node *AstNode, addNamePrefix string, output *CppParsedHeader, matcher HeaderMatcher) {
+func parseHeader(node *AstNode, addNamePrefix string, output *CppParsedHeader) {
 	kind := node.Kind
 	switch kind {
 	case "TranslationUnitDecl":
 		for _, inner := range node.Inner {
-			parseHeader(inner, addNamePrefix, output, matcher)
+			parseHeader(inner, addNamePrefix, output)
 		}
 	case "NamespaceDecl":
-		if !matcher(node.file(), output.Filename) {
+		if node.file() != output.Filename {
 			return
 		}
 
@@ -66,12 +49,12 @@ func parseHeader(node *AstNode, addNamePrefix string, output *CppParsedHeader, m
 			// Only process named namespaces
 			namespaceInner := node.Inner
 			for _, inner := range namespaceInner {
-				parseHeader(inner, addNamePrefix+namespace+"::", output, matcher)
+				parseHeader(inner, addNamePrefix+namespace+"::", output)
 			}
 		}
 
 	case "CXXRecordDecl":
-		if !matcher(node.file(), output.Filename) {
+		if node.file() != output.Filename {
 			return
 		}
 
@@ -90,7 +73,7 @@ func parseHeader(node *AstNode, addNamePrefix string, output *CppParsedHeader, m
 		output.Classes = append(output.Classes, obj)
 
 	case "EnumDecl":
-		if !matcher(node.file(), output.Filename) {
+		if node.file() != output.Filename {
 			return
 		}
 		// Child class enum
@@ -105,7 +88,7 @@ func parseHeader(node *AstNode, addNamePrefix string, output *CppParsedHeader, m
 		output.Enums = append(output.Enums, en)
 
 	case "TypeAliasDecl", "TypedefDecl":
-		if !matcher(node.file(), output.Filename) {
+		if node.file() != output.Filename {
 			return
 		}
 
