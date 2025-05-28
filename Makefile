@@ -2,7 +2,7 @@ SHELL := /bin/bash
 GO := go
 
 .PHONY: all
-all: genbindings
+all: genbindings copy-libseaqt
 
 cmd/miqt-docker/miqt-docker: go.mod cmd/miqt-docker/*.go docker/*.Dockerfile
 	$(GO) build -o cmd/miqt-docker/miqt-docker ./cmd/miqt-docker
@@ -29,3 +29,28 @@ reset-gen:
 		git -C $$name switch $$(git config -f .gitmodules submodule.$$name.branch); \
 		git -C $$name reset --hard $$(git -C $$name rev-list --max-parents=0 HEAD); \
 	done
+
+copy-libseaqt: genbindings
+	cd gen/ ;\
+	for a in *seaqt-*; do cp -ar ../libseaqt/* $$a; done ;\
+	for a in *seaqt-5.15; do cp -ar ../libseaqt-5.15/* $$a; done ;\
+	for a in *seaqt-6.4; do echo $a; cp -ar ../libseaqt-6.4/* $$a; done ;
+
+gencommits: copy-libseaqt
+	cd gen/ ;\
+	git submodule foreach git add -A ;\
+	git submodule foreach 'git commit -am "update bindings" || :'
+
+.PHONY : all clean genbindings gencommits copy-libseaqt github-ssh
+
+github-ssh:
+	git config url."git@github.com:".insteadOf "https://github.com/"
+	git submodule foreach --recursive 'git config url."git@github.com:".insteadOf "https://github.com/"'
+
+test-gen-5.15: cmd/miqt-docker/miqt-docker
+	./cmd/miqt-docker/miqt-docker genbindings /bin/bash -c 'cd gen/seaqt-5.15 && make -j$$(nproc) test'
+
+test-gen-6.4: cmd/miqt-docker/miqt-docker
+	./cmd/miqt-docker/miqt-docker genbindings /bin/bash -c 'cd gen/seaqt-6.4 && make -j$$(nproc) test'
+
+test: test-gen-5.15 test-gen-6.4
