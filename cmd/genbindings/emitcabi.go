@@ -71,28 +71,28 @@ func cabiOverrideVirtualName(c CppClass, m CppMethod) string {
 }
 
 func cppSubclassName(c CppClass) string {
-	return "MiqtVirtual" + strings.Replace(c.ClassName, `::`, ``, -1)
+	return "Virtual" + strings.Replace(c.ClassName, `::`, ``, -1)
 }
 
 func (p CppParameter) RenderTypeCabi() string {
 
 	if p.ParameterType == "QString" {
-		return "struct miqt_string"
+		return "struct seaqt_string"
 
 	} else if p.ParameterType == "QByteArray" {
-		return "struct miqt_string"
+		return "struct seaqt_string"
 
 	} else if inner, _, ok := p.QListOf(); ok {
-		return "struct miqt_array " + cppComment("of "+inner.RenderTypeCabi())
+		return "struct seaqt_array " + cppComment("of "+inner.RenderTypeCabi())
 
 	} else if inner, ok := p.QSetOf(); ok {
-		return "struct miqt_array " + cppComment("set of "+inner.RenderTypeCabi())
+		return "struct seaqt_array " + cppComment("set of "+inner.RenderTypeCabi())
 
 	} else if inner1, inner2, _, ok := p.QMapOf(); ok {
-		return "struct miqt_map " + cppComment("of "+inner1.RenderTypeCabi()+" to "+inner2.RenderTypeCabi())
+		return "struct seaqt_map " + cppComment("of "+inner1.RenderTypeCabi()+" to "+inner2.RenderTypeCabi())
 
 	} else if inner1, inner2, ok := p.QPairOf(); ok {
-		return "struct miqt_map " + cppComment("tuple of "+inner1.RenderTypeCabi()+" and "+inner2.RenderTypeCabi())
+		return "struct seaqt_map " + cppComment("tuple of "+inner1.RenderTypeCabi()+" and "+inner2.RenderTypeCabi())
 
 	} else if (p.Pointer || p.ByRef) && p.QtClassType() {
 		if p.PointerCount > 1 {
@@ -270,14 +270,14 @@ func emitCABI2CppForwarding(p CppParameter, indent string) (preamble string, for
 	nameprefix := makeNamePrefix(p.cParameterName())
 
 	if p.ParameterType == "QString" {
-		// The CABI received parameter is a struct miqt_string, passed by value
+		// The CABI received parameter is a struct seaqt_string, passed by value
 		// C++ needs it as a QString. Create one on the stack for automatic cleanup
-		// The caller will free the miqt_string
+		// The caller will free the seaqt_string
 		preamble += indent + "QString " + nameprefix + "_QString = QString::fromUtf8(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
 		return preamble, nameprefix + "_QString"
 
 	} else if p.ParameterType == "QByteArray" {
-		// The caller will free the miqt_string data
+		// The caller will free the seaqt_string data
 		// This ctor makes a deep copy, on the stack which will be dtor'd by RAII
 		preamble += indent + "QByteArray " + nameprefix + "_QByteArray(" + p.cParameterName() + ".data, " + p.cParameterName() + ".len);\n"
 		return preamble, nameprefix + "_QByteArray"
@@ -445,7 +445,7 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 			afterCall += indent + "QByteArray " + namePrefix + "_b = " + namePrefix + "_ret.toUtf8();\n"
 		}
 
-		afterCall += indent + "struct miqt_string " + namePrefix + "_ms;\n"
+		afterCall += indent + "struct seaqt_string " + namePrefix + "_ms;\n"
 		afterCall += indent + namePrefix + "_ms.len = " + namePrefix + "_b.length();\n"
 		afterCall += indent + namePrefix + "_ms.data = static_cast<char*>(malloc(" + namePrefix + "_ms.len));\n"
 		afterCall += indent + "memcpy(" + namePrefix + "_ms.data, " + namePrefix + "_b.data(), " + namePrefix + "_ms.len);\n"
@@ -453,12 +453,16 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		return indent + shouldReturn + rvalue + ";\n" + afterCall
 
 	} else if p.ParameterType == "QByteArray" {
-		// C++ has given us a QByteArray. CABI needs this as a struct miqt_string
+		// C++ has given us a QByteArray. CABI needs this as a struct seaqt_string
 		// Do not free the data, the caller will free it
 
-		shouldReturn = ifv(p.Const, "const ", "") + "QByteArray " + namePrefix + "_qb = "
+		if p.Pointer {
+			shouldReturn = ifv(p.Const, "const ", "") + "QByteArray& " + namePrefix + "_qb = *"
+		} else {
+			shouldReturn = ifv(p.Const, "const ", "") + "QByteArray " + namePrefix + "_qb = "
+		}
 
-		afterCall += indent + "struct miqt_string " + namePrefix + "_ms;\n"
+		afterCall += indent + "struct seaqt_string " + namePrefix + "_ms;\n"
 		afterCall += indent + namePrefix + "_ms.len = " + namePrefix + "_qb.length();\n"
 		afterCall += indent + namePrefix + "_ms.data = static_cast<char*>(malloc(" + namePrefix + "_ms.len));\n"
 		afterCall += indent + "memcpy(" + namePrefix + "_ms.data, " + namePrefix + "_qb.data(), " + namePrefix + "_ms.len);\n"
@@ -481,7 +485,7 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		afterCall += emitAssignCppToCabi(indent+"\t"+namePrefix+"_arr[i] = ", t, namePrefix+"_ret[i]")
 		afterCall += indent + "}\n"
 
-		afterCall += indent + "struct miqt_array " + namePrefix + "_out;\n"
+		afterCall += indent + "struct seaqt_array " + namePrefix + "_out;\n"
 		afterCall += indent + "" + namePrefix + "_out.len = " + namePrefix + "_ret.length();\n"
 		afterCall += indent + "" + namePrefix + "_out.data = static_cast<void*>(" + namePrefix + "_arr);\n"
 
@@ -500,7 +504,7 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		afterCall += emitAssignCppToCabi(indent+"\t"+namePrefix+"_arr["+namePrefix+"_ctr++] = ", t, namePrefix+"_itr.next()")
 		afterCall += indent + "}\n"
 
-		afterCall += indent + "struct miqt_array " + namePrefix + "_out;\n"
+		afterCall += indent + "struct seaqt_array " + namePrefix + "_out;\n"
 		afterCall += indent + "" + namePrefix + "_out.len = " + namePrefix + "_ret.size();\n"
 		afterCall += indent + "" + namePrefix + "_out.data = static_cast<void*>(" + namePrefix + "_arr);\n"
 
@@ -524,7 +528,7 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 
 		afterCall += indent + "}\n"
 
-		afterCall += indent + "struct miqt_map " + namePrefix + "_out;\n"
+		afterCall += indent + "struct seaqt_map " + namePrefix + "_out;\n"
 		afterCall += indent + "" + namePrefix + "_out.len = " + namePrefix + "_ret.size();\n"
 		afterCall += indent + "" + namePrefix + "_out.keys = static_cast<void*>(" + namePrefix + "_karr);\n"
 		afterCall += indent + "" + namePrefix + "_out.values = static_cast<void*>(" + namePrefix + "_varr);\n"
@@ -544,7 +548,7 @@ func emitAssignCppToCabi(assignExpression string, p CppParameter, rvalue string)
 		afterCall += emitAssignCppToCabi(indent+namePrefix+"_first_arr[0] = ", kType, namePrefix+"_ret.first")
 		afterCall += emitAssignCppToCabi(indent+namePrefix+"_second_arr[0] = ", vType, namePrefix+"_ret.second")
 
-		afterCall += indent + "struct miqt_map " + namePrefix + "_out;\n"
+		afterCall += indent + "struct seaqt_map " + namePrefix + "_out;\n"
 		afterCall += indent + "" + namePrefix + "_out.len = 1;\n"
 		afterCall += indent + "" + namePrefix + "_out.keys = static_cast<void*>(" + namePrefix + "_first_arr);\n"
 		afterCall += indent + "" + namePrefix + "_out.values = static_cast<void*>(" + namePrefix + "_second_arr);\n"
@@ -640,19 +644,19 @@ func getCabiZeroValue(p CppParameter) string {
 		return getCppZeroValue(p)
 
 	} else if p.ParameterType == "QString" || p.ParameterType == "QByteArray" {
-		return "(struct miqt_string){}"
+		return "(struct seaqt_string){}"
 
 	} else if _, _, ok := p.QListOf(); ok {
-		return "(struct miqt_array){}"
+		return "(struct seaqt_array){}"
 
 	} else if _, ok := p.QSetOf(); ok {
-		return "(struct miqt_array){}"
+		return "(struct seaqt_array){}"
 
 	} else if _, _, _, ok := p.QMapOf(); ok {
-		return "(struct miqt_map){}"
+		return "(struct seaqt_map){}"
 
 	} else if _, _, ok := p.QPairOf(); ok {
-		return "(struct miqt_map){}"
+		return "(struct seaqt_map){}"
 
 	} else {
 		// Difference for Qt classes: Qt C++ can expect to return them by value,
@@ -768,12 +772,16 @@ func cabiPreventStructDeclaration(className string) bool {
 	}
 }
 
-func emitBindingHeader(src *CppParsedHeader, filename string, packageName string) (string, error) {
+func emitBindingHeader(src *CppParsedHeader, filename string, qtModuleName string) (string, error) {
 	ret := strings.Builder{}
 
-	includeGuard := "MIQT_" + strings.ToUpper(strings.Replace(strings.Replace(packageName, `/`, `_`, -1), `-`, `_`, -1)) + "_GEN_" + strings.ToUpper(strings.Replace(strings.Replace(filename, `.`, `_`, -1), `-`, `_`, -1))
+	includeGuard := "SEAQT_" + strings.ToUpper(strings.Replace(strings.Replace(qtModuleName, `/`, `_`, -1), `-`, `_`, -1)) + "_GEN_" + strings.ToUpper(strings.Replace(strings.Replace(filename, `.`, `_`, -1), `-`, `_`, -1))
 
-	bindingInclude := strings.Repeat(`../`, strings.Count(packageName, `/`)) + "../libmiqt/libmiqt.h"
+	bindingInclude := "../libseaqt-runtime.h"
+
+	if strings.Contains(qtModuleName, `/`) {
+		bindingInclude = "../" + bindingInclude
+	}
 
 	ret.WriteString(`#pragma once
 #ifndef ` + includeGuard + `
@@ -794,7 +802,7 @@ extern "C" {
 `)
 
 	// We need this macro for QObjectData::dynamicMetaObject for Qt 6.9
-	if filename == "qobject.h" && packageName == "qt6" {
+	if filename == "qobject.h" && qtModuleName == "QtCore" {
 		ret.WriteString("// Based on the macro from Qt (LGPL v3), see https://www.qt.io/qt-licensing\n" +
 			"// Macro is trivial and used here under fair use\n" +
 			"// Usage does not imply derivation\n" +
@@ -843,7 +851,6 @@ extern "C" {
 	ret.WriteString("\n")
 
 	for _, c := range src.Classes {
-
 		className := cabiClassName(c.ClassName)
 		virtualMethods := c.VirtualMethods()
 		protectedMethods := c.ProtectedMethods()
