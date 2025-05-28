@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  genbindings:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    # WARNING: This loads the cache but does not commit back any new changes to
+    # it unless the cache is invalidated in GitHub
+    # It will help to do that every time a new Qt library is added
+    - name: Cache clang ASTs
+      uses: actions/cache@v4
+      with:
+        path: cmd/genbindings/cachedir
+        key: linux64-clang-cache
+
+    - name: Rebuild binding source
+      run: make genbindings copy-libseaqt
+
+    - name: Assert no changes
+      run: git submodule foreach 'git update-index --really-refresh && git diff-index HEAD'
+
+  linux64_qt5_c:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Linux Qt5 compile test
+      run: |
+        make test-5.15
+
+  linux64_qt6_c:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Linux Qt6 compile test
+      run: |
+        make test-6.4
