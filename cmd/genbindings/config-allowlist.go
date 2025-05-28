@@ -58,7 +58,7 @@ func InsertTypedefs(qt6 bool) {
 
 }
 
-func Widgets_AllowHeader(fullpath string) bool {
+func AllowHeader(fullpath string) bool {
 	fname := filepath.Base(fullpath)
 
 	if strings.HasSuffix(fname, `_impl.h`) {
@@ -365,6 +365,24 @@ func AllowMethod(className string, mm CppMethod) error {
 		if strings.HasSuffix(p.ParameterType, "Private") {
 			return ErrTooComplex // Skip private type
 		}
+		if className == "QMediaPlayer" || className == "QCamera" {
+			if p.ParameterType == "QVideoWidget" || p.ParameterType == "QGraphicsVideoItem" {
+				return ErrTooComplex // circular dep
+			}
+		}
+		if className == "QSignalMapper" && p.ParameterType == "QWidget" {
+			return ErrTooComplex // circular dep
+		}
+		if className == "QActionEvent" && p.ParameterType == "QAction" {
+			return ErrTooComplex // circular dep
+		}
+	}
+	if className == "QWebElement" && mm.ReturnType.ParameterType == "QWebFrame" {
+		return ErrTooComplex // circular dep
+	}
+	if className == "QActionEvent" && mm.ReturnType.ParameterType == "QAction" {
+		// TODO allow in qt6 where QAction has moved to QtGui
+		return ErrTooComplex // circular dep in Qt5
 	}
 	if strings.HasSuffix(mm.ReturnType.ParameterType, "Private") {
 		return ErrTooComplex // Skip private type
@@ -456,7 +474,7 @@ func AllowCtor(className string, mm CppMethod) bool {
 	}
 
 	// Default allow
-	return true
+	return AllowMethod(className, mm) == nil
 }
 
 // AllowType controls whether to permit binding of a method, if a method uses
@@ -713,6 +731,9 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"QOpenGLContext",                  // Qt OpenGL
 		"QwtPainterCommand",               // Qt Qwt, incomplete forward declaration
 		"QwtScaleMap",                     // Qt Qwt, incomplete forward declaration
+
+		"QDesignerFormEditorInterface", // https://github.com/mappu/miqt/issues/302
+
 		"____last____":
 		return ErrTooComplex
 	}
@@ -738,10 +759,18 @@ func ApplyQuirks(packageName, className string, mm *CppMethod) {
 		mm.RequireGOOS = addr("linux")
 	}
 
+	if className == "QArrayData" && mm.MethodName == "needsDetach" && mm.IsConst {
+		mm.BecomesNonConstInVersion = addr("6.7")
+	}
+
+	if packageName == "Qt6Core" && className == "QObjectData" && mm.MethodName == "dynamicMetaObject" {
+		mm.ReturnType.BecomesConstInVersion = addr("6.9")
+	}
+
 	// macOS Brew does not have Qt6Network dtls functionality enabled, but we
 	// want these functions to exist on other platforms
 	// Can't block in Go-side
-	if (packageName == "qt6/network" || packageName == "qt/network") &&
+	if (packageName == "Qt6Network" || packageName == "Qt5Network") &&
 		className == "QSslConfiguration" &&
 		(mm.MethodName == "dtlsCookieVerificationEnabled" || mm.MethodName == "setDtlsCookieVerificationEnabled" || mm.MethodName == "defaultDtlsConfiguration" || mm.MethodName == "setDefaultDtlsConfiguration") {
 		mm.RequireCpp = addr("QT_CONFIG(dtls)")

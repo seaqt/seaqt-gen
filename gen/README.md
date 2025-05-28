@@ -21,6 +21,15 @@ code is added to these submodules, to examine the changes:
 make gencommits
 ```
 
+When creating a feature branch in the main repository, a branch should be
+created for each of the submodules as well:
+
+```sh
+git switch -C myfeature
+# create/switch to myfeature-X.X branches in each gen/ submodule
+make genbranches
+```
+
 Users of `seaqt` can simply check out the appropriately versioned branch without
 history, but are recommended to fork the repository at the time of their usage
 since it will be recreated periodically.
