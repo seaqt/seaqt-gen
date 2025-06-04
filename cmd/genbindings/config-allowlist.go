@@ -240,15 +240,6 @@ func AllowInheritedParent(className string) bool {
 	return true
 }
 
-func AllowVirtual(mm CppMethod) bool {
-
-	if mm.MethodName == "metaObject" || mm.MethodName == "qt_metacast" {
-		return false
-	}
-
-	return true // AllowSignal(mm)
-}
-
 func AllowVirtualForClass(className string) bool {
 
 	// Allowing the subclassing of QAccessibleWidget compiles fine,
@@ -649,7 +640,7 @@ func AllowType(p CppParameter, isReturnType bool) error {
 	}
 
 	if p.Pointer && p.PointerCount >= 2 { // Out-parameters
-		if p.ParameterType != "char" {
+		if p.ParameterType != "char" && p.ParameterType != "void" {
 			return ErrTooComplex // e.g. QGraphicsItem_IsBlockedByModalPanel1
 		}
 		if p.ParameterType == "char" && p.ParameterName == "xpm" {
