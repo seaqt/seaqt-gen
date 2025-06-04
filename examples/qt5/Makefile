@@ -24,7 +24,7 @@ libqt.a: $(addsuffix .o,$(QT_LIBS:%=Qt%))
 	ar rcs $@ $^
 
 $(mains): %: %.c libqt.a
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(OPT) -o $@ $^
+	$(CXX) $(CFLAGS) $(OPT) -o $@ $^ $(LDFLAGS)
 
 clean:
 	rm -rf *.a *.o $(mains)
