@@ -1587,3 +1587,15 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 
 	return ret.String(), nil
 }
+
+// Create amalgamation / unity build source that includes all other generated
+// source files for a particular set of ".cpp" files
+func emitAmalgamation(cppFiles []string) string {
+	ret := strings.Builder{}
+
+	for _, cppFile := range cppFiles {
+		ret.WriteString("#include \"" + cppFile + "\"\n")
+	}
+
+	return ret.String()
+}

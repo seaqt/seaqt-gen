@@ -41,16 +41,24 @@ gencommits: copy-libseaqt
 	git submodule foreach git add -A ;\
 	git submodule foreach 'git commit -am "update bindings" || :'
 
-.PHONY : all clean genbindings gencommits copy-libseaqt github-ssh
+.PHONY: all genbindings gencommits copy-libseaqt github-ssh
 
 github-ssh:
 	git config url."git@github.com:".insteadOf "https://github.com/"
 	git submodule foreach --recursive 'git config url."git@github.com:".insteadOf "https://github.com/"'
 
+.PHONY: test-gen-5.15
 test-gen-5.15: cmd/miqt-docker/miqt-docker
 	./cmd/miqt-docker/miqt-docker genbindings /bin/bash -c 'cd gen/seaqt-5.15 && make -j$$(nproc) test'
 
+.PHONY: test-gen-6.4
 test-gen-6.4: cmd/miqt-docker/miqt-docker
 	./cmd/miqt-docker/miqt-docker genbindings /bin/bash -c 'cd gen/seaqt-6.4 && make -j$$(nproc) test'
 
+.PHONY: test
 test: test-gen-5.15 test-gen-6.4
+
+.PHONY: examples
+examples:
+	$(MAKE) -C $@
+

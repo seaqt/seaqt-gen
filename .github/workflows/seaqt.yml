@@ -43,6 +43,7 @@ jobs:
     - name: Linux Qt5 compile test
       run: |
         make test-gen-5.15
+        cd examples && make qt5
 
   linux64_qt6_c:
     runs-on: ubuntu-24.04
@@ -56,3 +57,4 @@ jobs:
     - name: Linux Qt6 compile test
       run: |
         make test-gen-6.4
+        cd examples && make qt6
