@@ -58,7 +58,10 @@ test-gen-6.4: cmd/miqt-docker/miqt-docker
 .PHONY: test
 test: test-gen-5.15 test-gen-6.4
 
-.PHONY: examples
-examples:
-	$(MAKE) -C $@
+.PHONY: examples examples-5.15 examples-6.4
+examples-5.15:
+	./cmd/miqt-docker/miqt-docker genbindings /bin/bash -c 'cd examples && make -j$$(nproc) qt5'
+examples-6.4:
+	./cmd/miqt-docker/miqt-docker genbindings /bin/bash -c 'cd examples && make -j$$(nproc) qt6'
 
+examples: examples-5.15 examples-6.4

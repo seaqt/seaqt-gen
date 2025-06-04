@@ -5,9 +5,9 @@ QT_LIBS := Core Gui Widgets
 
 OPT := -flto=auto -Os
 
-CFLAGS := -g -I$(SEAQT_DIR)
-CXXFLAGS := -g -I$(SEAQT_DIR) -I. $(QT_LIBS:%=-I$(SEAQT_DIR)/seaqt/Qt%) $(shell pkg-config --cflags $(QT_LIBS:%=Qt5%))
-LDFLAGS := -g -I$(SEAQT_DIR) $(shell pkg-config --libs $(QT_LIBS:%=Qt5%)) -L.
+CFLAGS := -g -I$(SEAQT_DIR) -fPIC
+CXXFLAGS := $(CFLAGS) -I. $(QT_LIBS:%=-I$(SEAQT_DIR)/seaqt/Qt%) $(shell pkg-config --cflags $(QT_LIBS:%=Qt5%))
+LDFLAGS := -g -fPIC $(shell pkg-config --libs $(QT_LIBS:%=Qt5%)) -L.
 
 examples := helloworld
 mains := $(patsubst %,%/main,$(examples))
