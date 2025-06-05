@@ -1192,7 +1192,7 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 					// original method name (CppCallTarget), not the MethodName
 
 					ret.WriteString(
-						"\tvirtual " + m.ReturnType.RenderTypeQtCpp() + " " + m.CppCallTarget() + "(" + emitParametersCpp(m, "") + ") " + ifv(m.IsConst, "const ", "") + ifv(m.IsNoExcept, "noexcept ", "") + "override {\n",
+						"\tvirtual " + m.ReturnType.RenderTypeQtCpp() + " " + m.CppCallTarget() + "(" + emitParametersCpp(m, "") + ") " + ifv(m.IsConst, "const ", "") + ifv(len(m.Noexcept) > 0, m.Noexcept+" ", "") + "override {\n",
 					)
 
 					ret.WriteString("\t\tif (vtbl->" + m.SafeMethodName() + " == 0) {\n")
