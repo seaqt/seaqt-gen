@@ -11,7 +11,8 @@ $(dirs):
 
 .PHONY: $(nimdirs)
 $(nimdirs):
-	nimble test_$$(echo $(@:nim-seaqt-%=%) | tr -- . _)
+	nimble examples_$$(echo $(@:nim-seaqt-%=%) | tr -- . _)
+	QT_QPA_PLATFORM=offscreen nimble test_$$(echo $(@:nim-seaqt-%=%) | tr -- . _)
 
 .PHONY: clean $(dirs:%=%-clean) $(nim-dirs:%=%-clean)
 clean: $(dirs:%=%-clean) $(nim-dirs:%=%-clean)
