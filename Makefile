@@ -63,3 +63,8 @@ $(VERSIONS:%=test-%): cmd/miqt-docker/miqt-docker
 .PHONY: test $(VERSIONS:%=test-%)
 test: $(VERSIONS:%=test-%)
 
+.PHONY: examples $(VERSIONS:%=examples-%)
+$(VERSIONS:%=examples-%): cmd/miqt-docker/miqt-docker
+	./cmd/miqt-docker/miqt-docker genbindings /bin/bash -c 'cd examples && make -j$$(nproc) seaqt-$(@:examples-%=%)'
+
+examples: $(VERSIONS:%=examples-%)
