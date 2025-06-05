@@ -141,6 +141,8 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 	// PASS 2
 	//
 
+	cppFiles := make([]string, 0, len(processHeaders))
+
 	for _, parsed := range processHeaders {
 
 		log.Printf("Processing %q...", parsed.Filename)
@@ -179,6 +181,7 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 		if err != nil {
 			panic(err)
 		}
+		cppFiles = append(cppFiles, genUnitName(parsed.Filename)+".cpp")
 
 		bindingHSrc, err := emitBindingHeader(parsed, filepath.Base(parsed.Filename), qtModuleName)
 		if err != nil {
@@ -192,6 +195,15 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 
 		// Done
 
+	}
+
+	{
+		amalgamation := emitAmalgamation(cppFiles)
+
+		err := os.WriteFile(filepath.Join(outDir, qtModuleName+".cpp"), []byte(amalgamation), 0644)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	log.Printf("Processing %d file(s) completed", len(includeFiles))
