@@ -604,14 +604,23 @@ func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter, copy bo
 			preamble += gfs.ind + "var " + nameprefix + "_Values_CArray = newSeq[" + vType.parameterTypeNim(gfs) + "](len(" + p.nimParameterName() + "))\n"
 		}
 		preamble += gfs.ind + "var " + nameprefix + "_ctr = 0\n"
-
-		preamble += gfs.ind + "for " + nameprefix + "_k, " + nameprefix + "_v in " + p.nimParameterName() + ":\n"
+		// TODO https://github.com/nim-lang/Nim/issues/24720
+		// let's hope iteration order is stable :facepalm:
+		preamble += gfs.ind + "for " + nameprefix + "_k in " + p.nimParameterName() + ".keys():\n"
 		gfs.indent()
 		kType.ParameterName = nameprefix + "_k"
 		addPreamble, innerRvalue := gfs.emitParameterNim2CABIForwarding(kType, copy)
 		preamble += addPreamble
 		preamble += gfs.ind + nameprefix + "_Keys_CArray[" + nameprefix + "_ctr] = " + innerRvalue + "\n"
-
+		preamble += gfs.ind + nameprefix + "_ctr += 1\n"
+		gfs.dedent()
+		preamble += gfs.ind + nameprefix + "_ctr = 0\n"
+		if copy {
+			preamble += gfs.ind + "for " + nameprefix + "_v in " + p.nimParameterName() + ".mvalues():\n"
+		} else {
+			preamble += gfs.ind + "for " + nameprefix + "_v in " + p.nimParameterName() + ".values():\n"
+		}
+		gfs.indent()
 		vType.ParameterName = nameprefix + "_v"
 		addPreamble, innerRvalue = gfs.emitParameterNim2CABIForwarding(vType, copy)
 		preamble += addPreamble
@@ -655,8 +664,15 @@ func (gfs *nimFileState) emitParameterNim2CABIForwarding(p CppParameter, copy bo
 		// cPointer() returns the cgo pointer which only works in the same package -
 		// anything cross-package needs to go via unsafe.Pointer
 
-		rvalue = p.nimParameterName() + ".h"
-
+		if copy {
+			// hack: this is a move, not a copy!
+			preamble += gfs.ind + p.nimParameterName() + ".owned = false # TODO move?\n"
+			preamble += gfs.ind + "let " + nameprefix + "_h = " + p.nimParameterName() + ".h\n"
+			preamble += gfs.ind + p.nimParameterName() + ".h = nil\n"
+			rvalue = nameprefix + "_h"
+		} else {
+			rvalue = p.nimParameterName() + ".h"
+		}
 	} else if p.IntType() || p.IsFlagType() || p.IsKnownEnum() || p.ParameterType == "bool" {
 		if p.Pointer || p.ByRef {
 			rvalue = p.nimParameterName() // n.b. This may not work if the integer type conversion was wrong
@@ -790,31 +806,13 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 		// We can only reference the rvalue once, in case it is a complex
 		// expression
 
-		rvalue = crossPackage + cabiClassNameNim(rt.ParameterType, false) + "(h: " + rvalue + ")"
-
 		if !(rt.Pointer || rt.ByRef) {
 			// This is return by value, but CABI has new'd it into a
-			// heap type for us
-			// To preserve Qt's approximate semantics, add a runtime
-			// finalizer to automatically Delete once the type goes out
-			// of Go scope
-			// lines += namePrefix + "_goptr := " + rvalue + "\n"
-			// lines += namePrefix + "_goptr.GoGC() // Qt uses pass-by-value semantics for this type. Mimic with finalizer\n"
-
-			// If this is a function return, we have converted value-returned Qt types to pointers
-			// If this is a slot return, we haven't
-			// TODO standardize this
-			// e.g. QStringListModel::ItemData
-			// if strings.Contains(assignExpr, `return`) {
-			// 	lines += assignExpr + "" + namePrefix + "_goptr\n"
-			// } else {
-			// 	lines += assignExpr + "*" + namePrefix + "_goptr\n"
-			// }
-
-			// TODO
+			// heap type for us - assume ownership of the instace
+			rvalue = crossPackage + cabiClassNameNim(rt.ParameterType, false) + "(h: " + rvalue + ", owned: true)"
 			lines += gfs.ind + assignExpr + rvalue + "\n"
 		} else {
-			// No need for temporary _goptr variable
+			rvalue = crossPackage + cabiClassNameNim(rt.ParameterType, false) + "(h: " + rvalue + ", owned: false)"
 			lines += gfs.ind + assignExpr + rvalue + "\n"
 		}
 
@@ -965,6 +963,7 @@ proc connectRaw*(
       typeVal,
       senderMetaObject.h,
     ),
+    owned: true,
   )
 
 `)
@@ -981,7 +980,8 @@ proc connectRaw*(
 		nimClassName := cabiClassNameNim(c.ClassName, false)
 		importClassName := cabiClassName(c.ClassName)
 
-		pragmas := " {.inheritable, pure.}"
+		pragmas := " {.inheritable.}"
+
 		inherit := ""
 		mi := false
 		for _, base := range c.DirectInherits {
@@ -1289,7 +1289,8 @@ type %[1]sVTable {.pure.} = object
 `, rawClassName, ncabiToVdataName(c), cabiToVdataName(c),
 				ncabiFromVdataName(c), cabiFromVdataName(c))
 
-			fmt.Fprintf(&ret, `type %[1]sVTable* = object
+			fmt.Fprintf(&ret, `
+type %[1]sVTable* {.inheritable, pure.} = object
   vtbl: %[2]sVTable
 `, nimClassName, rawClassName)
 
@@ -1512,7 +1513,7 @@ type %[1]sVTable {.pure.} = object
 				}
 
 				fmt.Fprintf(&ret, `proc create%[1]s*(%[3]s): %[2]s =
-%[4]s  let tmp = %[2]s(h: %[5]s(%[6]s))
+%[4]s  let tmp = %[2]s(h: %[5]s(%[6]s), owned: true)
 `, maybeSuffix(j), nimPkgClassName, strings.Join(vparams, ",\n    "),
 					preamble, ncabiNewName(c, i), forwarding)
 
@@ -1529,7 +1530,8 @@ type %[1]sVTable {.pure.} = object
 			fmt.Fprintf(&ret, `const %[1]s_mvtbl = %[1]sVTable(
   destructor: proc(self: pointer) {.cdecl.} =
     let inst = cast[ptr typeof(Virtual%[2]s()[])](self.%[3]s()[])
-    inst[].h = nil,
+    inst[].h = nil
+    inst[].owned = false,
 
 `, rawClassName, nimClassName, ncabiToVdataName(c))
 			for _, m := range virtualMethods {
@@ -1589,15 +1591,6 @@ type %[1]sVTable {.pure.} = object
   gen_qobjectdefs_types.QMetaObject(h: fc%s())
 `, nimPkgClassName, cabiStaticMetaObjectName(c))
 			}
-		}
-
-		if c.CanDelete {
-			cabi.WriteString(`proc ` + ncabiDeleteName(c) + `(self: pointer) {.importc: "` + cabiDeleteName(c) + `".}
-`)
-
-			ret.WriteString(`proc delete*(self: ` + nimPkgClassName + `) =
-  ` + ncabiDeleteName(c) + `(self.h)
-`)
 		}
 	}
 
