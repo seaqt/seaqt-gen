@@ -1023,15 +1023,16 @@ extern "C" {
 			}
 		}
 
-		// TODO private signals: https://github.com/mappu/miqt/pull/225
-		// for _, m := range c.PrivateSignals {
-		// 	ret.WriteString(fmt.Sprintf("%s %s(%s* self, intptr_t slot);\n", m.ReturnType.RenderTypeCabi(), cabiConnectName(c, m), className))
-		// }
-
-		for _, p := range c.Props {
-			if p.PropertyName == "staticMetaObject" {
-				ret.WriteString(fmt.Sprintf("const QMetaObject* %s();\n", cabiStaticMetaObjectName(c)))
+		for _, m := range c.PrivateSignals {
+			callbackParams := "intptr_t"
+			for _, p := range m.Parameters {
+				callbackParams += ", " + p.RenderTypeCabi()
 			}
+
+			ret.WriteString(fmt.Sprintf("%s %s(%s* self, intptr_t slot, void (*callback)(%s), void (*release)(intptr_t));\n", m.ReturnType.RenderTypeCabi(), cabiConnectName(c, m), className, callbackParams))
+		}
+		if len(c.PrivateSignals) > 0 {
+			ret.WriteString("\n")
 		}
 
 		if c.CanDelete {
@@ -1449,8 +1450,7 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 				// If there are hidden parameters, the type of the signal itself
 				// needs to include them
 				exactSignal := `static_cast<void (` + c.ClassName + `::*)(` + emitParameterTypesCpp(m, true) + `)` + ifv(m.IsConst, ` const`, ``) + `>(&` + c.ClassName + `::` + m.CppCallTarget() + `)`
-
-				paramArgs := []string{"slot"}
+				paramArgs := []string{"release.slot"}
 				paramArgDefs := []string{"intptr_t cb"}
 
 				var signalCode string
@@ -1461,7 +1461,7 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 					paramArgDefs = append(paramArgDefs, p.RenderTypeCabi()+" "+p.cParameterName())
 				}
 
-				signalCode += "\t\t\tcallback(" + strings.Join(paramArgs, `, `) + ");\n"
+				signalCode += "\t\t\tcallback(" + strings.Join(paramArgs, `, `) + ");"
 
 				callbackParams := "intptr_t"
 
@@ -1470,19 +1470,52 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 				}
 
 				ret.WriteString(
-					`void ` + cabiConnectName(c, m) + `(` + className + `* self, intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) {` + `
-	struct local_caller : seaqt::caller {
-		constexpr local_caller(intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) : callback(callback), caller{slot, release} {}
-		void (*callback)(` + callbackParams + `);
-		void operator()(` + emitParametersCpp(m, "") + `) {
-` + signalCode + `		}
-	};
-` +
-						"\t" + className + `::connect(self, ` + exactSignal + ", self, local_caller{slot, callback, release});\n" +
-						"}\n" +
-						"\n",
-				)
+					`void ` + cabiConnectName(c, m) + `(` + className + `* self, intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) {
+	` + className + `::connect(self, ` + exactSignal + ", self, [callback, release = seaqt::release_callback{slot,release}](" + emitParametersCpp(m, "") + `) {
+` + signalCode + `
+	});
+}
+
+`)
 			}
+		}
+
+		for _, m := range c.PrivateSignals {
+			// Private signals have an extra QPrivateSignalParameter that we cannot
+			// reference by name - instead, we'll make a lambda with an extra `auto`
+			// parameter that the compiler will have to figure out.
+			//
+			// Also, there's no (trivial) way to cast the type so we'll have to hope
+			// there are no overloads.
+			exactSignal := `&` + c.ClassName + `::` + m.CppCallTarget()
+			paramArgs := []string{"release.slot"}
+			paramArgDefs := []string{"intptr_t cb"}
+
+			var signalCode string
+
+			for i, p := range m.Parameters {
+				signalCode += emitAssignCppToCabi(fmt.Sprintf("\t\t\t%s sigval%d = ", p.RenderTypeCabi(), i+1), p, p.cParameterName())
+				paramArgs = append(paramArgs, fmt.Sprintf("sigval%d", i+1))
+				paramArgDefs = append(paramArgDefs, p.RenderTypeCabi()+" "+p.cParameterName())
+			}
+
+			signalCode += "\t\t\tcallback(" + strings.Join(paramArgs, `, `) + ");"
+
+			callbackParams := "intptr_t"
+
+			for _, p := range m.Parameters {
+				callbackParams += ", " + p.RenderTypeCabi()
+			}
+			privateSignalParam := ifv(len(m.Parameters) == 0, "auto", ", auto")
+
+			ret.WriteString(
+				`void ` + cabiConnectName(c, m) + `(` + className + `* self, intptr_t slot, void (*callback)(` + callbackParams + `), void (*release)(intptr_t)) {
+	` + className + `::connect(self, ` + exactSignal + ", self, [callback, release = seaqt::release_callback{slot,release}](" + emitParametersCpp(m, "") + privateSignalParam + `) {
+` + signalCode + `
+	});
+}
+
+`)
 		}
 
 		// FIXME(hack): In some platforms (Android Qt 5), instantiating a
@@ -1583,8 +1616,6 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 
 			}
 		}
-
-		// TODO private signals: https://github.com/mappu/miqt/pull/225
 
 		// Delete
 		// If we subclassed, our class destructor is always virtual. Therefore
