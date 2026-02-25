@@ -1035,6 +1035,12 @@ extern "C" {
 			ret.WriteString("\n")
 		}
 
+		for _, p := range c.Props {
+			if p.PropertyName == "staticMetaObject" {
+				ret.WriteString(fmt.Sprintf("const QMetaObject* %s();\n", cabiStaticMetaObjectName(c)))
+			}
+		}
+
 		if c.CanDelete {
 			ret.WriteString(fmt.Sprintf("void %s(%s* self);\n", cabiDeleteName(c), className))
 		}
