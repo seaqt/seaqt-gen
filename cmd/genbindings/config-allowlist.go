@@ -225,6 +225,9 @@ func AllowClass(className string) bool {
 		"QStringConverterBase",           // not a public class, will be removed in Qt 7
 		"QStringConverterBase::State",    // not a public class, will be removed in Qt 7
 		"QVariantConstPointer",           // scheduled for deprecation in Qt 6.15
+
+		"QDesignerFormEditorInterface", // https://github.com/mappu/miqt/issues/302
+
 		"____last____":
 		return false
 	}
@@ -344,6 +347,26 @@ func AllowVirtualForClass(className string) bool {
 	}
 
 	if className == "QDesignerPromotionInterface" {
+		return false
+	}
+
+	if className == "QDesignerFormEditorPluginInterface" {
+		return false
+	}
+
+	if className == "QDesignerWidgetFactoryInterface" {
+		return false
+	}
+
+	if className == "QDesignerFormWindowManagerInterface" {
+		return false
+	}
+
+	if className == "QDesignerMetaDataBaseInterface" {
+		return false
+	}
+
+	if className == "QDesignerFormWindowToolInterface" {
 		return false
 	}
 
@@ -731,6 +754,9 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"QOpenGLContext",                  // Qt OpenGL
 		"QwtPainterCommand",               // Qt Qwt, incomplete forward declaration
 		"QwtScaleMap",                     // Qt Qwt, incomplete forward declaration
+
+		"QDesignerFormEditorInterface", // https://github.com/mappu/miqt/issues/302
+
 		"____last____":
 		return ErrTooComplex
 	}
