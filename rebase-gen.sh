@@ -45,7 +45,7 @@ while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
             echo "  ERROR: Conflicts in non-gen files!" >&2
         fi
 
-        make gencommits >/dev/null 2>&1 || die "make gencommits failed"
+        make gencommits -j8 >/dev/null 2>&1 || die "make gencommits failed"
         git add gen/* >/dev/null 2>&1 || true
     fi
 

@@ -1610,7 +1610,7 @@ static constexpr std::size_t seaqt_aligned_sizeof() {
 			for _, m := range protectedMethods {
 
 				vbpreamble, vbforwarding := emitParametersCABI2CppForwarding(m.Parameters, "\t\t", false)
-				vbCallTarget := "self->" + m.CppCallTarget() + "(" + vbforwarding + ")"
+				vbCallTarget := "self->" + c.ClassName + "::" + m.CppCallTarget() + "(" + vbforwarding + ")"
 
 				ret.WriteString(
 					m.ReturnType.RenderTypeCabi() + " " + cabiProtectedBaseName(c, m) + "(" + emitParametersCabi(m, ifv(m.IsConst, "const ", "")+subclassName+"*") + ") {\n" +

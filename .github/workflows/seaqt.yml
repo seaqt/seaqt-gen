@@ -9,50 +9,40 @@ on:
 jobs:
   genbindings:
     runs-on: ubuntu-24.04
-
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["5.15", "6.4", "6.5", "6.8", "6.11"]
     steps:
     - name: Checkout
       uses: actions/checkout@v7
       with:
         submodules: true
 
-    # WARNING: This loads the cache but does not commit back any new changes to
-    # it unless the cache is invalidated in GitHub
-    # It will help to do that every time a new Qt library is added
     - name: Cache clang ASTs
       uses: actions/cache@v6
       with:
         path: cmd/genbindings/cachedir
-        key: linux64-clang-cache
+        key: linux64-clang-cache-qt${{ matrix.version }}
 
-    - name: Rebuild binding source
-      run: make genbindings copy-libseaqt
+    - name: Build bindings for Qt ${{ matrix.version }}
+      run: make genbindings-${{ matrix.version }}
 
     - name: Assert no changes
       run: git submodule foreach 'git update-index --really-refresh && git diff-index HEAD'
 
-  linux64_qt5_c:
+  compile:
     runs-on: ubuntu-24.04
-
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [ "5.15", "6.4" ]
     steps:
     - name: Checkout
       uses: actions/checkout@v7
       with:
         submodules: true
 
-    - name: Linux Qt5 compile test
+    - name: Compile test (Qt ${{ matrix.version }})
       run: |
-        make test-5.15 examples-5.15
-
-  linux64_qt6_c:
-    runs-on: ubuntu-24.04
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-      with:
-        submodules: true
-
-    - name: Linux Qt6 compile test
-      run: |
-        make test-6.4 examples-6.4
+        make test-${{ matrix.version }} examples-${{ matrix.version }}
