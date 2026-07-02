@@ -75,8 +75,7 @@ Contributions to `seaqt-gen` are welcome. When contributing, there are a few thi
     * run `make gencommits` to generate new commits in `gen`, updating the "official" `qt-<version>` branches
     * Update the PR to point to these commits
     * Merge
-* When this repository is rebased against `miqt`, the `qt-<version>` branches in the submodules are recreated from scratch, one commit for every seaqt commit that changes them
-  * The first commit is used to seed these branches
+* When this repository is rebased against `miqt`, the `qt-<version>` branches in the submodules are reset to the state of the `master` branch as orphan branches, preserving the generated bindings
 
 The above workflow is likely to be [replaced](https://github.com/seaqt/seaqt-gen/issues/3) with something more smooth as the project evolves.
 
