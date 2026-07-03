@@ -232,8 +232,26 @@ func AllowClass(className string) bool {
 
 		"QNativeInterface::QSGOpenGLTexture", // Abstract class, cannot be instantiated (?)
 		"QNativeInterface::QSGVulkanTexture", // ..
+		"QSGMaterialRhiShader",               // Contains complex return values that need additional fixing
 
-		"QSGMaterialRhiShader", // Contains complex return values that need additional fixing
+		"QSGMaterialType",       // Missing header
+		"QCameraPermission",     // Missing header
+		"QMicrophonePermission", // Missing header
+		"QGenericRunnable",      // Missing header
+
+		"QLocationPermission",  // Messy
+		"QCalendarPermission",  // Messy
+		"QBluetoothPermission", // Messy
+		"QContactsPermission",  // Messy
+
+		"QProcess::UnixProcessParameters", // Arrays
+		"QUuid::Id128Bytes",
+		"QAbstractVideoBuffer::MapData",
+
+		"QtAudio::Error",
+		"QtAudio::State",
+
+		"QNativeInterface::QWaylandScreen",
 
 		"____last____":
 		return false
@@ -377,6 +395,18 @@ func AllowVirtualForClass(className string) bool {
 		return false
 	}
 
+	if className == "QSGMaterial" {
+		return false
+	}
+
+	if className == "QAbstractEventDispatcherV2" {
+		return false
+	}
+
+	if className == "QQuickRhiItemRenderer" {
+		return false
+	}
+
 	return true
 }
 
@@ -398,10 +428,27 @@ func AllowMethod(className string, mm CppMethod) error {
 			return ErrTooComplex // circular dep
 		}
 
+		if p.ParameterType == "QtWebEngineCore::TouchSelectionMenuController" {
+			return ErrTooComplex
+		}
+		if p.ParameterType == "QtWebEngineCore::AutofillPopupController" {
+			return ErrTooComplex
+		}
+		if p.ParameterType == "QQuickWebEngineAction" {
+			return ErrTooComplex
+		}
+		if p.ParameterType == "QWebEnginePage::PermissionPolicy" {
+			return ErrTooComplex
+		}
+		if p.ParameterType == "QJSValue" {
+			return ErrTooComplex
+		}
+
 		if className == "QQuickWebEngineProfile" && p.ParameterType == "QQuickWebEngineDownloadRequest" {
 			// TODO  Note: To use from C++ static_cast download to QWebEngineDownloadRequest
 			return ErrTooComplex // circular dep
 		}
+
 	}
 	if className == "QQuickWebEngineProfile" && mm.ReturnType.ParameterType == "QQuickWebEngineScriptCollection" {
 		return ErrTooComplex // circular dep
@@ -488,6 +535,18 @@ func AllowMethod(className string, mm CppMethod) error {
 	// go through the binding
 	if mm.ReturnType.IntType() && mm.ReturnType.ByRef {
 		return ErrTooComplex // e.g. QSize::rheight()
+	}
+
+	if className == "QDirListing::const_iterator" && mm.MethodName == "operator*" {
+		return ErrTooComplex // const problems in return type
+	}
+
+	if className == "QVersionNumber" && mm.ReturnType.ParameterType == "QVersionNumber::const_iterator" {
+		return ErrTooComplex // Private type accessed via public alias
+	}
+
+	if className == "QVersionNumber" && mm.ReturnType.ParameterType == "QVersionNumber::iterator" {
+		return ErrTooComplex // Private type accessed via public alias
 	}
 
 	return nil // OK, allow
@@ -613,6 +672,15 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		return ErrTooComplex // Qt 5 Qwt QwtPlotZoomer::zoomStack()
 	}
 	if strings.HasPrefix(p.ParameterType, "QSharedPointer<") {
+		return ErrTooComplex
+	}
+	if strings.HasPrefix(p.ParameterType, "QSpan<") {
+		return ErrTooComplex
+	}
+	if strings.HasPrefix(p.ParameterType, "EulerAngles<") {
+		return ErrTooComplex
+	}
+	if strings.HasPrefix(p.ParameterType, "FinalizeResultChar<") {
 		return ErrTooComplex
 	}
 
@@ -788,6 +856,19 @@ func AllowType(p CppParameter, isReturnType bool) error {
 		"VkImage",
 		"VkImageLayout",
 		"VkPhysicalDevice",
+
+		"QRhiCommandBuffer",
+		"QRhiRenderBuffer",
+		"QRhiSwapChain",
+		"QRhiAdapter",
+
+		"QSGMaterial",
+		"QSGMaterialType",
+
+		"QQuickWebEngineView",
+
+		"wl_output",
+
 		"____last____":
 		return ErrTooComplex
 	}

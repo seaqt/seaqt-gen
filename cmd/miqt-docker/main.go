@@ -136,7 +136,7 @@ func getDockerRunArgsForGlob(dockerfiles []fs.DirEntry, containerNameGlob string
 		"-i",     // Interactive (supports stdin)
 	}
 
-	if isatty {
+	if isatty && false { // TODO doesn't work with make -j
 		fullCommand = append(fullCommand, "-t")
 	}
 
