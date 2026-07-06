@@ -847,7 +847,7 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 	return lines
 }
 
-func emitNimPkg(qtModuleName, pcName string) string {
+func emitNimPkg(qtModuleName, pcName, modVersion string) string {
 	return fmt.Sprintf(`const
   %[1]sCFlags* =
     gorge("pkg-config --cflags %[2]s") &
@@ -862,7 +862,7 @@ func emitNimPkg(qtModuleName, pcName string) string {
     ## The version used when compiling the application
 
 {.passl: %[1]sLibs}
-`, qtModuleName, pcName, pkgConfig(pcName, "--modversion"))
+`, qtModuleName, pcName, modVersion)
 }
 
 func emitNim(src *CppParsedHeader, headerName string, qtModuleName string, pcName string) (string, string, error) {
