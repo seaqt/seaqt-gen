@@ -27,7 +27,7 @@ genbindings-base: cmd/miqt-docker/miqt-docker docker/genbindings-base.Dockerfile
 # Generate bindings for each Qt version
 $(VERSIONS:%=genbindings-%): genbindings-base cmd/miqt-docker/miqt-docker cmd/genbindings/genbindings
 	export VERSION=$(@:genbindings-%=%) && \
-	cd cmd/genbindings && ../miqt-docker/miqt-docker genbindings-qt$${VERSION} ./genbindings -version=$${VERSION} ./genbindings && cd ../.. && \
+	cd cmd/genbindings && ../miqt-docker/miqt-docker genbindings-qt$${VERSION} ./genbindings && cd ../.. && \
 	for a in libseaqt/*; do cp -aR "$$a" "gen/seaqt-$${VERSION}/"; done && \
 	for a in libseaqt-$${VERSION%.*}/*; do cp -aR "$$a" gen/seaqt-$${VERSION}/; done && \
 	for a in libseaqt/*; do cp -aR "$$a" "gen/nim-seaqt-$${VERSION}/"; done && \

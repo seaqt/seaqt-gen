@@ -94,6 +94,7 @@ func AllowHeader(fullpath string) bool {
 		"qguiapplication_platform.h",   // Qt 6 - can be built for X11 but then platform-specific code fails to build on Windows
 		"qlogging.h",                   // TODO varargs
 		"qstringlist.h",                // handled separately
+		"qcomparehelpers.h",            // Should not be included directly
 		"____last____":
 		return false
 	}
@@ -252,6 +253,13 @@ func AllowClass(className string) bool {
 		"QtAudio::State",
 
 		"QNativeInterface::QWaylandScreen",
+
+		"OrgA11yAtspiSocketInterface",
+		"OrgA11yBusInterface",
+		"OrgA11yStatusInterface",
+		"OrgFreedesktopDBusPropertiesInterface",
+		"CacheAdaptor",
+		"DeviceEventControllerAdaptor",
 
 		"____last____":
 		return false

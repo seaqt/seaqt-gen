@@ -63,11 +63,15 @@ func pkgConfig(pcName, what string) string {
 	return strings.TrimSpace(string(stdout))
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+// moduleVersion queries the version of a Qt module via pkg-config.
+// Returns the module-specific version, or falls back to the main Qt version if pkg-config fails.
+func moduleVersion(pcName string) string {
+	stdout, err := exec.Command(`pkg-config`, `--modversion`, pcName).Output()
+	if err != nil {
+		// pkg-config not available or module not found
+		return ""
 	}
-	return b
+	return strings.TrimSpace(string(stdout))
 }
 
 func genUnitName(header string) string {
@@ -105,8 +109,10 @@ func parseHeaders(includeFiles []string, clangBin string, cflags []string) []*Cp
 	return result
 }
 
-func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExtras, outDir, nimOutdir string) {
-
+func generate(
+	qtModuleName, pcName, qtHeaders, qtVersion string, srcDirs []string,
+	clangBin, cflagsExtras, outDir, nimOutdir string,
+) {
 	var includeFiles []string
 	for _, srcDir := range srcDirs {
 		if strings.HasSuffix(srcDir, `.h`) {
@@ -115,10 +121,33 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 			includeFiles = append(includeFiles, findHeadersInDir(srcDir)...)
 		}
 	}
-
+	// Query module-specific version via pkg-config
+	moduleVersion := moduleVersion(pcName)
 	log.Printf("Found %d header files to process.", len(includeFiles))
 
-	cflags := append(strings.Fields(cflagsExtras), strings.Fields(pkgConfig(pcName, "--cflags"))...)
+	// pkg-config does not provide private header paths which are needed to parse
+	// some of the qt modules - we'll add them manually here based on
+	// QT_INSTALL_HEADERS/QT_VERSION.
+	qtHeadersModDir := filepath.Join(qtHeaders, qtModuleName)
+	privateHeadersDir := filepath.Join(qtHeadersModDir, moduleVersion)
+
+	var cflags = append(
+		strings.Fields(cflagsExtras),
+		strings.Fields(pkgConfig(pcName, "--cflags"))...,
+	)
+
+	cflags = append(
+		cflags, "-I"+qtHeaders, "-I"+qtHeadersModDir, "-I"+privateHeadersDir,
+	)
+
+	if qtModuleName != "QtCore" {
+		coreDir := filepath.Join(qtHeaders, "QtCore")
+		privateCoreDir := filepath.Join(coreDir, qtVersion)
+		cflags = append(
+			cflags, "-I"+coreDir, "-I"+privateCoreDir,
+		)
+	}
+
 	outDir = filepath.Join(outDir, qtModuleName)
 	os.MkdirAll(outDir, 0755)
 
@@ -169,7 +198,7 @@ func generate(qtModuleName, pcName string, srcDirs []string, clangBin, cflagsExt
 	// PASS 2
 	//
 	{
-		libsSrc := emitNimPkg(qtModuleName, pcName)
+		libsSrc := emitNimPkg(qtModuleName, pcName, moduleVersion)
 		os.WriteFile(filepath.Join(nimOutdir, nimModulePkgName(qtModuleName)+".nim"), []byte(libsSrc), 0644)
 	}
 
@@ -291,14 +320,8 @@ func main() {
 	clang := flag.String("clang", "clang", "Custom path to clang")
 	outDir := flag.String("outdir", "../../gen", "Output directory for generated gen_** files")
 	extraLibsDir := flag.String("extralibs", "/usr/local/src/", "Base directory to find extra library checkouts")
-	version := flag.String("version", "", "Qt version to generate bindings for (5 or 6)")
-	buildOnly := flag.Bool("build-only", false, "Exit after building the Docker image, skip generation")
 
 	flag.Parse()
 
-	if *buildOnly {
-		return
-	}
-
-	ProcessLibraries(*clang, *outDir, *extraLibsDir, *version)
+	ProcessLibraries(*clang, *outDir, *extraLibsDir)
 }
