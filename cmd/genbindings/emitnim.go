@@ -290,6 +290,10 @@ func (p CppParameter) renderTypeNim(gfs *nimFileState, cabi, isparam bool) strin
 	}
 
 	if t, ok := p.QSetOf(); ok {
+		if cabi {
+			// The CABI hands a QSet<> over as a seaqt_array, like a QList<>
+			return "struct_seaqt_array"
+		}
 		gfs.stdImports["std/sets"] = struct{}{}
 		return "HashSet[" + t.renderTypeNim(gfs, cabi, false) + "]"
 	}
@@ -760,12 +764,13 @@ func (gfs *nimFileState) emitCabiToNim(assignExpr string, rt CppParameter, rvalu
 
 		lines += gfs.ind + "var " + namePrefix + "_ma = " + rvalue + "\n"
 
-		lines += gfs.ind + namePrefix + "x_ret: HashSet[" + t.renderTypeNim(gfs, false, false) + "])\n"
-		lines += gfs.ind + namePrefix + "_outCast = cast[ptr UncheckedArray[" + t.parameterTypeNim(gfs) + "](" + namePrefix + "_ma.data))\n"
-		lines += gfs.ind + "for i in 0..<" + namePrefix + "_ma.len:\n"
+		lines += gfs.ind + "var " + namePrefix + "x_ret = initHashSet[" + t.renderTypeNim(gfs, false, false) + "](int(" + namePrefix + "_ma.len))\n"
+		lines += gfs.ind + "let " + namePrefix + "_outCast = cast[ptr UncheckedArray[" + t.parameterTypeNim(gfs) + "]](" + namePrefix + "_ma.data)\n"
+		lines += gfs.ind + "for i in 0 ..< " + namePrefix + "_ma.len:\n"
 		gfs.indent()
 		lines += gfs.emitCabiToNim(namePrefix+"x_ret.incl ", t, namePrefix+"_outCast[i]")
 		gfs.dedent()
+		lines += gfs.ind + "c_free(" + namePrefix + "_ma.data)\n"
 
 		lines += gfs.ind + assignExpr + namePrefix + "x_ret\n"
 
