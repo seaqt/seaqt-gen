@@ -858,8 +858,13 @@ func emitNimPkg(qtModuleName, pcName, modVersion string) string {
   %[1]sGenVersion* = "%[3]s"
     ## The version used for generating the bindings
 
-  %[1]sBuildVersion* = gorge("pkg-config --modversion %[2]s")
-    ## The version used when compiling the application
+  %[1]sBuildVersion* {.strdefine.} =
+    block:
+      const v = gorge("pkg-config --modversion %[2]s")
+      if v.len > 0: v else: %[1]sGenVersion
+    ## The version used when compiling the application - nim check and
+    ## nimsuggest do not run gorge and fall back to the generation version;
+    ## override with -d:%[1]sBuildVersion=x.y.z
 
 {.passl: %[1]sLibs}
 `, qtModuleName, pcName, modVersion)
