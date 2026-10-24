@@ -17,7 +17,8 @@ func cppComment(s string) string {
 func cReservedWord(s string) bool {
 	// parameter names that appear as properties in Qt, for example
 	switch s {
-	case "default", "vtbl", "vdata": // not language-reserved words, but a binding-reserved words
+	case "default", "vtbl", "vdata", // not language-reserved words, but a binding-reserved words
+		"self": // the receiver's name in every generated function (QRemoteObjectPendingCallWatcher::finished(self))
 		return true
 	default:
 		return false
