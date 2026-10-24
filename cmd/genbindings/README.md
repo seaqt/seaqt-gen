@@ -34,6 +34,10 @@ You should check the following configuration:
 - `config-libraries.go`: Input directories containing Qt headers
 - `config-allowlist.go`: Check everything
 
+## Generating a subset of modules
+
+`-modules` limits a run to the named modules, for example `./genbindings -modules Core,Network,RemoteObjects`. The modules are generated in the order of the list in `config-libraries.go`, whatever order they are named in, and an unknown name panics. A module's Qt dependencies must be named too (`pkg-config --print-requires Qt6<Module>`): a class is only known once its module has been parsed in the same run, so `-modules RemoteObjects` alone panics with `Class QtROIoDeviceBase inherits from unknown class QObject`. The output directory for the Qt version is replaced, so it holds only the selected modules.
+
 ## Steps to add extra libraries to MIQT
 
 1. Git clone this repository

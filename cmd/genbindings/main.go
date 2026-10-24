@@ -320,8 +320,9 @@ func main() {
 	clang := flag.String("clang", "clang", "Custom path to clang")
 	outDir := flag.String("outdir", "../../gen", "Output directory for generated gen_** files")
 	extraLibsDir := flag.String("extralibs", "/usr/local/src/", "Base directory to find extra library checkouts")
+	modules := flag.String("modules", "", "Comma-separated Qt modules to generate, e.g. Core,Network,RemoteObjects (default: all). Name a module's dependencies too")
 
 	flag.Parse()
 
-	ProcessLibraries(*clang, *outDir, *extraLibsDir)
+	ProcessLibraries(*clang, *outDir, *extraLibsDir, *modules)
 }

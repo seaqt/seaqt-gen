@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,22 +16,48 @@ func toMajorMinor(qtVersion string) string {
 	return parts[0] + "." + parts[1]
 }
 
-func ProcessLibraries(clangBin, outDir, extraLibsDir string) {
+// selectModules narrows modules to the comma-separated names in filter, keeping the
+// order of modules. An empty filter selects every module.
+func selectModules(modules []string, filter string) []string {
+	if filter == "" {
+		return modules
+	}
+	want := map[string]bool{}
+	for _, m := range strings.Split(filter, ",") {
+		if m = strings.TrimSpace(m); m != "" {
+			want[m] = true
+		}
+	}
+	var ret []string
+	for _, m := range modules {
+		if want[m] {
+			ret = append(ret, m)
+			delete(want, m)
+		}
+	}
+	for m := range want {
+		log.Panicf("-modules: unknown module %q", m)
+	}
+	log.Printf("-modules: generating %v", ret)
+	return ret
+}
+
+func ProcessLibraries(clangBin, outDir, extraLibsDir, moduleFilter string) {
 	qtVersion := qmakeQuery("QT_VERSION")
 	major := toMajor(qtVersion)
 	majorMinor := toMajorMinor(qtVersion)
 	CacheSubdir = "qt" + majorMinor
 
 	if major == "5" {
-		buildQt5(clangBin, outDir, extraLibsDir, qtVersion)
+		buildQt5(clangBin, outDir, extraLibsDir, qtVersion, moduleFilter)
 	} else if major == "6" {
-		buildQt6(clangBin, outDir, extraLibsDir, qtVersion)
+		buildQt6(clangBin, outDir, extraLibsDir, qtVersion, moduleFilter)
 	} else {
 		panic("unsupported qt version: " + major)
 	}
 }
 
-func buildQt5(clangBin, outDir, extraLibsDir, qtVersion string) {
+func buildQt5(clangBin, outDir, extraLibsDir, qtVersion, moduleFilter string) {
 	flushKnownTypes()
 	InsertTypedefs(false)
 
@@ -66,7 +93,7 @@ func buildQt5(clangBin, outDir, extraLibsDir, qtVersion string) {
 		// Tools
 		// TODO(build fails) "Designer", "UiPlugin", "UiTools",
 	}
-	for _, lib := range modules {
+	for _, lib := range selectModules(modules, moduleFilter) {
 		generate(
 			"Qt"+lib, "Qt5"+lib, qtHeaders, qtVersion,
 			[]string{filepath.Join(qtHeaders, "Qt"+lib)},
@@ -75,7 +102,7 @@ func buildQt5(clangBin, outDir, extraLibsDir, qtVersion string) {
 	}
 }
 
-func buildQt6(clangBin, outDir, extraLibsDir, qtVersion string) {
+func buildQt6(clangBin, outDir, extraLibsDir, qtVersion, moduleFilter string) {
 	flushKnownTypes()
 	InsertTypedefs(true)
 
@@ -109,7 +136,7 @@ func buildQt6(clangBin, outDir, extraLibsDir, qtVersion string) {
 		"Quick", "WebEngineQuick",
 	}
 
-	for _, lib := range modules {
+	for _, lib := range selectModules(modules, moduleFilter) {
 		generate(
 			"Qt"+lib, "Qt6"+lib, qtHeaders, qtVersion,
 			[]string{filepath.Join(qtHeaders, "Qt"+lib)},
