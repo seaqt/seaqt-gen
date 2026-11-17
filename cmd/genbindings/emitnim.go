@@ -51,7 +51,8 @@ func nimReservedWord(s string) bool {
 		"shl", "shr", "static", "template", "try", "tuple", "type", "using", "var",
 		"when", "while", "xor", "yield",
 		"Exception",
-		"super", "ret", "result", "create", "string", "seq", "self" // not language-reserved words, but a binding-reserved words
+		// binding-reserved words
+		"super", "ret", "result", "create", "string", "seq", "self":
 		return true
 	default:
 		return false
