@@ -100,6 +100,8 @@ func buildQt6(clangBin, outDir, extraLibsDir, qtVersion string) {
 
 		"Pdf", "PdfWidgets", "Positioning",
 
+		"RemoteObjects",
+
 		"StateMachine",
 
 		"Designer", "UiPlugin", "UiTools",

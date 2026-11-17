@@ -5,7 +5,7 @@ ENV QT_ARCH=gcc_64
 
 RUN \
     /aqtinstall/bin/aqt install-qt linux desktop ${QT6_VERSION} ${QT_ARCH} \
-        -m qtmultimedia qtpdf qtpositioning qtscxml qtwebchannel qtwebengine qtwebsockets \
+        -m qtmultimedia qtpdf qtpositioning qtremoteobjects qtscxml qtwebchannel qtwebengine qtwebsockets \
         --outputdir /opt/Qt && \
     rm -rf /root/.cache
 
