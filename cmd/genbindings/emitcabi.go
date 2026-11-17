@@ -17,7 +17,8 @@ func cppComment(s string) string {
 func cReservedWord(s string) bool {
 	// parameter names that appear as properties in Qt, for example
 	switch s {
-	case "default", "vtbl", "vdata": // not language-reserved words, but a binding-reserved words
+	// binding-reserved names
+        case "default", "vtbl", "vdata", "self":
 		return true
 	default:
 		return false
