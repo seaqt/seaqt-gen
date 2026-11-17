@@ -51,8 +51,7 @@ func nimReservedWord(s string) bool {
 		"shl", "shr", "static", "template", "try", "tuple", "type", "using", "var",
 		"when", "while", "xor", "yield",
 		"Exception",
-		"super", "ret", "result", "create", "string", "seq", // not language-reserved words, but a binding-reserved words
-		"self": // the receiver's name in every generated proc (QRemoteObjectPendingCallWatcher::finished(self))
+		"super", "ret", "result", "create", "string", "seq", "self" // not language-reserved words, but a binding-reserved words
 		return true
 	default:
 		return false
